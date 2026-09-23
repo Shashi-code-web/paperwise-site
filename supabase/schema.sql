@@ -9,3 +9,7 @@ create policy "customers see own orders" on orders for select using (auth.uid() 
 create policy "customers see own order items" on order_items for select using (exists (select 1 from orders where orders.id = order_items.order_id and orders.user_id = auth.uid()));
 create policy "public sees active products" on products for select using (active = true);
 -- Keep the private-pdfs Storage bucket private. Server service-role access is used only by the functions above.
+
+
+-- Administrator read policies. Admin writes remain protected by the server-side MFA/role check.
+create policy "admins read profiles" on profiles for select using (id = auth.uid() or exists (select 1 from profiles p where p.id = auth.uid() and p.role = 'admin'));
