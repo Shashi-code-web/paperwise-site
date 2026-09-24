@@ -32,9 +32,11 @@ function renderProducts(){
   });
 }
 function renderCart(){
-  if(products.length) cart=cart.filter(id=>productById(id));
-  $('#cartCount').textContent=cart.length;
-  const items=cart.map(productById);
+  // Ignore saved cart IDs until products have loaded; discard stale IDs afterwards.
+  const visibleCart=products.length ? cart.filter(id=>productById(id)) : [];
+  if(products.length && visibleCart.length!==cart.length){cart=visibleCart;localStorage.setItem('paperwise-cart',JSON.stringify(cart));}
+  $('#cartCount').textContent=visibleCart.length;
+  const items=visibleCart.map(productById);
   $('#cartTotal').textContent='₹'+(items.reduce((n,p)=>n+p.price_paise,0)/100).toFixed(0);
   $('#cartItems').innerHTML='';
   if(!items.length){$('#cartItems').innerHTML='<div class="empty">Your bag is waiting for a good read.</div>';}
