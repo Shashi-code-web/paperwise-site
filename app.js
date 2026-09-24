@@ -1,81 +1,140 @@
-const sb=window.supabase?.createClient(window.PAPERWISE_SUPABASE_URL,window.PAPERWISE_SUPABASE_ANON_KEY);
-const api=window.PAPERWISE_API_BASE;
-const $=s=>document.querySelector(s);
-let products=[],cart=JSON.parse(localStorage.getItem('paperwise-cart')||'[]');
-const toast=$('#toast');
-function notify(s){toast.textContent=s;toast.classList.add('show');setTimeout(()=>toast.classList.remove('show'),4500);}
-function safe(s){return String(s??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
-function money(p){return '₹'+(p/100).toFixed(2);}
+const API=(window.PAPERWISE_API_BASE||'').replace(/\/$/,'');
+const sb=window.supabase&&window.PAPERWISE_SUPABASE_URL&&window.PAPERWISE_SUPABASE_ANON_KEY
+  ?window.supabase.createClient(window.PAPERWISE_SUPABASE_URL,window.PAPERWISE_SUPABASE_ANON_KEY):null;
+let products=[];
+let cart=JSON.parse(localStorage.getItem('paperwise-cart')||'[]');
+const $=s=>document.querySelector(s),grid=$('#productGrid'),toast=$('#toast');
+
+function showToast(message){toast.textContent=message;toast.classList.add('show');setTimeout(()=>toast.classList.remove('show'),2800);}
 function save(){localStorage.setItem('paperwise-cart',JSON.stringify(cart));renderCart();}
+function colorFor(index){return ['sage','peach','lavender'][index%3];}
+function productById(id){return products.find(p=>p.id===id);}
 function renderProducts(){
- $('#productGrid').innerHTML=products.length?products.map(p=>`<article class="product"><div class="cover sage"><small>PAPERWISE / DIGITAL EDITION</small><div class="cover-title">${safe(p.title)}</div><div class="cover-foot">INSTANT DIGITAL DELIVERY</div></div><div class="product-info"><h3>${safe(p.title)}</h3><span class="price">${money(p.price_paise)}</span><p>${safe(p.description)}</p><div class="product-actions"><button class="tiny-btn preview" data-preview="${p.id}">Preview details</button><button class="tiny-btn" data-add="${p.id}">Add to bag +</button></div></div></article>`).join(''):'<p class="empty">Our first editions are coming soon. Check back shortly.</p>';
+  grid.replaceChildren();
+  if(!products.length){
+    const empty=document.createElement('div');empty.className='empty';empty.style.gridColumn='1/-1';empty.textContent='New editions are being prepared.';grid.append(empty);return;
+  }
+  products.forEach((p,index)=>{
+    const article=document.createElement('article');article.className='product';
+    const cover=document.createElement('div');cover.className='cover '+colorFor(index);
+    const label=document.createElement('small');label.textContent='PAPERWISE / EDITION';
+    const title=document.createElement('div');title.className='cover-title';title.textContent=p.title;
+    const foot=document.createElement('div');foot.className='cover-foot';foot.textContent='DIGITAL EDITION';
+    cover.append(label,title,foot);
+    const info=document.createElement('div');info.className='product-info';
+    const h=document.createElement('h3');h.textContent=p.title;
+    const price=document.createElement('span');price.className='price';price.textContent='₹'+(p.price_paise/100).toFixed(0);
+    const desc=document.createElement('p');desc.textContent=p.description;
+    const actions=document.createElement('div');actions.className='product-actions';
+    const preview=document.createElement('button');preview.className='tiny-btn preview';preview.textContent='Preview';preview.dataset.preview=p.id;
+    const add=document.createElement('button');add.className='tiny-btn';add.textContent='Add to bag +';add.dataset.add=p.id;
+    actions.append(preview,add);info.append(h,price,desc,actions);article.append(cover,info);grid.append(article);
+  });
 }
 function renderCart(){
- const items=cart.map(id=>products.find(p=>p.id===id)).filter(Boolean);
- $('#cartCount').textContent=items.length;$('#cartTotal').textContent=money(items.reduce((n,p)=>n+p.price_paise,0));
- $('#cartItems').innerHTML=items.length?items.map((p,i)=>`<div class="cart-item"><div class="mini-cover sage">${safe(p.title)}</div><div><h4>${safe(p.title)}</h4><p>Digital PDF · ${money(p.price_paise)}</p></div><button class="remove" data-remove="${i}">Remove</button></div>`).join(''):'<div class="empty">Your bag is waiting for a good read.</div>';
- $('#checkoutBtn').disabled=!items.length;$('#checkoutBtn').style.opacity=items.length?'1':'.45';
+  cart=cart.filter(id=>productById(id));
+  $('#cartCount').textContent=cart.length;
+  const items=cart.map(productById);
+  $('#cartTotal').textContent='₹'+items.reduce((n,p)=>n+p.price_paise,0)/100;
+  $('#cartItems').innerHTML='';
+  if(!items.length){$('#cartItems').innerHTML='<div class="empty">Your bag is waiting for a good read.</div>';}
+  else items.forEach((p,i)=>{
+    const row=document.createElement('div');row.className='cart-item';
+    const mini=document.createElement('div');mini.className='mini-cover '+colorFor(products.indexOf(p));mini.textContent=p.title;
+    const meta=document.createElement('div');const h=document.createElement('h4');h.textContent=p.title;const d=document.createElement('p');d.textContent='Digital PDF · ₹'+(p.price_paise/100).toFixed(0);meta.append(h,d);
+    const remove=document.createElement('button');remove.className='remove';remove.textContent='Remove';remove.dataset.remove=String(i);
+    row.append(mini,meta,remove);$('#cartItems').append(row);
+  });
+  $('#checkoutBtn').disabled=!items.length;$('#checkoutBtn').style.opacity=items.length?'1':'.45';
+}
+function drawer(id,on=true){$('#'+id).classList.toggle('open',on);$('#overlay').classList.toggle('open',on);$('#'+id).setAttribute('aria-hidden',!on);}
+async function session(){if(!sb)return null;return (await sb.auth.getSession()).data.session||null;}
+async function apiFetch(path,options={}){
+  const s=await session();if(!s)throw new Error('Please sign in first.');
+  const res=await fetch(API+path,{...options,headers:{Authorization:'Bearer '+s.access_token,'Content-Type':'application/json',...(options.headers||{})}});
+  const data=await res.json().catch(()=>({}));if(!res.ok)throw new Error(data.error||'Request failed');return data;
+}
+function renderAccountLogin(){
+  $('#accountContent').replaceChildren();
+  const note=document.createElement('p');note.className='login-note';note.textContent='Create an account or sign in to access purchases and downloads.';
+  const email=document.createElement('input');email.type='email';email.placeholder='Email address';email.autocomplete='email';
+  const pass=document.createElement('input');pass.type='password';pass.placeholder='Password';pass.autocomplete='current-password';
+  const signIn=document.createElement('button');signIn.className='button dark full';signIn.textContent='Sign in';
+  const signUp=document.createElement('button');signUp.className='button cream full';signUp.style.marginTop='10px';signUp.textContent='Create account';
+  const status=document.createElement('p');status.className='login-note';
+  signIn.onclick=async()=>{status.textContent='Signing in…';try{const {error}=await sb.auth.signInWithPassword({email:email.value.trim(),password:pass.value});if(error)throw error;await renderAccount();}catch(e){status.textContent=e.message||'Sign in failed';}};
+  signUp.onclick=async()=>{status.textContent='Creating account…';try{const {data,error}=await sb.auth.signUp({email:email.value.trim(),password:pass.value});if(error)throw error;status.textContent=data.session?'Account created.':'Account created. Check your email if confirmation is required.';if(data.session)await renderAccount();}catch(e){status.textContent=e.message||'Sign up failed';}};
+  $('#accountContent').append(note,email,pass,signIn,signUp,status);
+}
+async function renderAccount(){
+  const s=await session();$('#accountContent').replaceChildren();
+  if(!s){renderAccountLogin();return;}
+  const head=document.createElement('div');const who=document.createElement('p');who.className='login-note';who.textContent='Signed in as '+(s.user.email||'customer');
+  const signOut=document.createElement('button');signOut.className='button cream full';signOut.textContent='Sign out';signOut.onclick=async()=>{await sb.auth.signOut();renderAccount();};
+  const area=document.createElement('div');area.className='account-area';const h=document.createElement('h3');h.textContent='Your library';area.append(h);
+  $('#accountContent').append(who,signOut,area);
+  try{
+    const data=await apiFetch('/api/library');
+    if(!data.orders?.length){const empty=document.createElement('p');empty.className='login-note';empty.textContent='Your library is empty. Your paid editions will appear here.';area.append(empty);return;}
+    for(const order of data.orders){
+      const day=document.createElement('small');day.textContent=order.paid_at?new Date(order.paid_at).toLocaleDateString():'Paid';
+      for(const item of order.order_items||[]){
+        const row=document.createElement('div');row.className='order';
+        const title=document.createElement('span');title.textContent=item.products?.title||'Edition';
+        const dl=document.createElement('button');dl.className='tiny-btn';dl.textContent='Download';dl.onclick=async()=>{dl.disabled=true;try{const result=await apiFetch('/api/download',{method:'POST',body:JSON.stringify({productId:item.products.id})});window.location.href=result.url;setTimeout(()=>{dl.disabled=false;},1200);}catch(e){showToast(e.message);dl.disabled=false;}};
+        row.append(title,day,dl);area.append(row);
+      }
+    }
+  }catch(e){const err=document.createElement('p');err.className='login-note';err.textContent=e.message;area.append(err);}
+}
+async function startCheckout(){
+  if(!cart.length)return;
+  if(!sb){showToast('Account service is unavailable.');return;}
+  const s=await session();
+  if(!s){drawer('cartDrawer',false);drawer('accountDrawer',true);renderAccountLogin();showToast('Sign in to continue to checkout.');return;}
+  if(!window.Razorpay){showToast('Payment checkout is loading. Try again in a moment.');return;}
+  const button=$('#checkoutBtn');button.disabled=true;button.textContent='Preparing checkout…';
+  try{
+    const data=await apiFetch('/api/checkout',{method:'POST',body:JSON.stringify({productIds:[...new Set(cart)]})});
+    const options={
+      key:data.keyId,order_id:data.razorpayOrderId,amount:data.amount,currency:data.currency,name:'Paperwise',
+      description:'Digital PDF purchase',
+      prefill:{email:s.user.email||''},
+      theme:{color:'#132133'},
+      handler:async()=>{cart=[];save();showToast('Payment submitted. Your library updates after payment confirmation.');setTimeout(()=>{drawer('accountDrawer',true);renderAccount();},1800);},
+      modal:{ondismiss:()=>{button.disabled=false;button.textContent='Secure checkout →';}}
+    };
+    new window.Razorpay(options).open();
+  }catch(e){showToast(e.message);button.disabled=false;button.textContent='Secure checkout →';}
 }
 async function loadProducts(){
- try{const r=await fetch(api+'/api/products');if(!r.ok)throw Error('Catalogue unavailable');const d=await r.json();products=d.products||[];cart=cart.filter(id=>products.some(p=>p.id===id));renderProducts();save();}
- catch(e){$('#productGrid').textContent='Catalogue temporarily unavailable. Please try again later.';}
+  try{const res=await fetch(API+'/api/products');const data=await res.json();if(!res.ok)throw new Error(data.error||'Unable to load editions');products=(data.products||[]);renderProducts();renderCart();}
+  catch(e){grid.innerHTML='<div class="empty" style="grid-column:1/-1">The catalogue is temporarily unavailable. Please try again shortly.</div>';showToast(e.message);}
 }
-function drawer(id,on=true){$('#'+id).classList.toggle('open',on);$('#overlay').classList.toggle('open',on);$('#'+id).setAttribute('aria-hidden',String(!on));}
-async function session(){return (await sb.auth.getSession()).data.session;}
-async function request(path,options={}){
- const s=await session();if(!s)throw Error('Please sign in first');
- const r=await fetch(api+path,{...options,headers:{Authorization:'Bearer '+s.access_token,...(options.body?{'Content-Type':'application/json'}:{}),...(options.headers||{})}});
- const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'Request failed');return d;
-}
-async function library(){
- const target=$('#accountContent');target.replaceChildren();
- const heading=document.createElement('h3');heading.textContent='Your purchased library';target.append(heading);
- try{
-  const data=await request('/api/library');
-  if(!data.orders.length){target.append(document.createTextNode('No completed purchases yet.'));return;}
-  for(const order of data.orders)for(const item of order.order_items||[]){
-   const p=item.products;if(!p)continue;
-   const row=document.createElement('div');row.className='account-area';
-   const title=document.createElement('h4');title.textContent=p.title;
-   const button=document.createElement('button');button.className='tiny-btn';button.textContent='Download PDF';
-   button.onclick=async()=>{button.disabled=true;try{const d=await request('/api/download',{method:'POST',body:JSON.stringify({productId:p.id})});window.open(d.url,'_blank','noopener,noreferrer');}catch(e){notify(e.message);}finally{button.disabled=false;}};
-   row.append(title,button);target.append(row);
-  }
- }catch(e){target.append(document.createTextNode(e.message));}
-}
-async function account(){
- drawer('accountDrawer');
- const target=$('#accountContent'),s=await session();
- if(s){target.innerHTML='<p>Signed in as '+safe(s.user.email)+'</p><button class="button dark full" id="myLibrary">My purchases</button><button class="tiny-btn" id="signOut">Sign out</button>';$('#myLibrary').onclick=library;$('#signOut').onclick=async()=>{await sb.auth.signOut();account();};return;}
- target.innerHTML='<h3>Sign in or create an account</h3><form id="customerAuth"><input id="customerEmail" type="email" placeholder="Email" required autocomplete="email" style="width:100%;padding:12px;margin:8px 0"><input id="customerPassword" type="password" placeholder="Password (6+ characters)" minlength="6" required autocomplete="current-password" style="width:100%;padding:12px;margin:8px 0"><button class="button dark full" type="submit">Sign in</button><button class="tiny-btn" type="button" id="signUp">Create account</button><p id="authStatus" role="status"></p></form>';
- const email=$('#customerEmail'),password=$('#customerPassword'),status=$('#authStatus');
- $('#customerAuth').onsubmit=async e=>{e.preventDefault();status.textContent='Signing in…';const {error}=await sb.auth.signInWithPassword({email:email.value.trim(),password:password.value});if(error)status.textContent=error.message;else account();};
- $('#signUp').onclick=async()=>{status.textContent='Creating account…';const {error}=await sb.auth.signUp({email:email.value.trim(),password:password.value});status.textContent=error?error.message:'Account created. Check your email for a confirmation link if required, then sign in.';};
-}
-async function loadRazorpay(){
- if(window.Razorpay)return;
- await new Promise((resolve,reject)=>{const s=document.createElement('script');s.src='https://checkout.razorpay.com/v1/checkout.js';s.onload=resolve;s.onerror=()=>reject(Error('Payment window unavailable'));document.head.append(s);});
-}
-async function checkout(){
- if(!cart.length)return;
- if(!(await session())){notify('Sign in to continue to checkout.');await account();return;}
- const button=$('#checkoutBtn');button.disabled=true;
- try{
-  const d=await request('/api/checkout',{method:'POST',body:JSON.stringify({productIds:[...new Set(cart)]})});
-  await loadRazorpay();
-  const rz=new window.Razorpay({key:d.keyId,amount:d.amount,currency:d.currency,order_id:d.razorpayOrderId,name:'PaperWise',description:'Digital PDF editions',handler:async()=>{cart=[];save();drawer('cartDrawer',false);notify('Payment submitted. Your download appears after payment verification.');await account();await library();},modal:{ondismiss:()=>{button.disabled=false;}}});
-  rz.on('payment.failed',()=>{notify('Payment was not completed. Please retry.');button.disabled=false;});rz.open();
- }catch(e){notify(e.message);button.disabled=false;}
-}
+renderProducts();renderCart();loadProducts();
 document.addEventListener('click',e=>{
- const add=e.target.closest('[data-add]');if(add){if(!cart.includes(add.dataset.add))cart.push(add.dataset.add);save();notify('Added to your bag.');return;}
- const preview=e.target.closest('[data-preview]');if(preview){const p=products.find(x=>x.id===preview.dataset.preview);if(p){$('#previewTitle').textContent=p.title;$('#previewQuote').textContent=p.description;$('#previewDialog').showModal();}return;}
- const remove=e.target.closest('[data-remove]');if(remove){cart.splice(Number(remove.dataset.remove),1);save();return;}
- const close=e.target.closest('[data-close]');if(close)drawer(close.dataset.close,false);
+  const id=e.target.dataset.add;
+  if(id){if(!cart.includes(id)){cart.push(id);save();showToast('Added to your bag.');}else showToast('Already in your bag.');return;}
+  const pre=e.target.dataset.preview;
+  if(pre){const p=productById(pre);if(!p)return;$('#previewTitle').textContent=p.title;$('#previewQuote').textContent=p.description;$('#previewDialog').showModal();return;}
+  if(e.target.dataset.remove!==undefined){cart.splice(Number(e.target.dataset.remove),1);save();}
+  if(e.target.dataset.close)drawer(e.target.dataset.close,false);
 });
-$('#cartBtn').onclick=()=>drawer('cartDrawer');$('#accountBtn').onclick=account;$('#checkoutBtn').onclick=checkout;
+$('#cartBtn').onclick=()=>drawer('cartDrawer');
+$('#accountBtn').onclick=async()=>{drawer('accountDrawer');await renderAccount();};
 $('#overlay').onclick=()=>{drawer('cartDrawer',false);drawer('accountDrawer',false);};
 $('#closePreview').onclick=()=>$('#previewDialog').close();
-$('#viewAll').onclick=()=>$('#library').scrollIntoView({behavior:'smooth'});
-$('#newsletterForm').onsubmit=e=>{e.preventDefault();notify('Newsletter registration is not available yet.');};
-loadProducts();
+$('#viewAll').onclick=()=>document.querySelector('#library').scrollIntoView({behavior:'smooth'});
+$('#checkoutBtn').onclick=startCheckout;
+$('#newsletterForm').onsubmit=e=>{e.preventDefault();e.target.reset();showToast('You’re on the list — welcome.');};
+
+(function(){
+  const params=new URLSearchParams(window.location.search);
+  if(params.get('adminLogin')!=='1'||!sb)return;
+  const box=document.createElement('div');
+  box.innerHTML='<div style="position:fixed;inset:0;background:rgba(13,23,36,.96);z-index:99999;display:flex;align-items:center;justify-content:center;padding:24px"><div style="background:#fff;width:100%;max-width:420px;padding:32px;border-radius:16px;box-sizing:border-box"><h2 style="margin-top:0">Paperwise Admin</h2><p>Sign in to continue to the admin console.</p><input id="adminEmail" type="email" placeholder="Admin email" autocomplete="username" style="width:100%;padding:14px;margin:8px 0;box-sizing:border-box"><input id="adminPassword" type="password" placeholder="Password" autocomplete="current-password" style="width:100%;padding:14px;margin:8px 0;box-sizing:border-box"><button id="adminLoginButton" style="width:100%;padding:14px;margin-top:10px;cursor:pointer">Sign in</button><p id="adminLoginMessage" style="margin-top:14px"></p><button id="adminBackButton" style="border:0;background:none;cursor:pointer">← Back to Paperwise</button></div></div>';
+  document.body.appendChild(box);
+  const email=$('#adminEmail'),password=$('#adminPassword'),button=$('#adminLoginButton'),message=$('#adminLoginMessage'),back=$('#adminBackButton');
+  button.onclick=async()=>{message.textContent='Signing in…';button.disabled=true;const {error}=await sb.auth.signInWithPassword({email:email.value.trim(),password:password.value});if(error){message.textContent=error.message;button.disabled=false;return;}location.href='admin.html?v=7';};
+  back.onclick=()=>location.href='index.html';
+})();
