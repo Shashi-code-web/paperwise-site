@@ -2,7 +2,7 @@ import { requireUser, supabaseAdmin, json } from './_lib/supabase.js';
 
 async function admin(req){
   const user=await requireUser(req);
-  const aal=user?.aal||'aal1';
+  const token=req.headers.authorization.replace(/^Bearer\s+/i,''); const aal=JSON.parse(Buffer.from(token.split('.')[1],'base64url').toString('utf8')).aal||'aal1';
   if(aal!=='aal2') throw Object.assign(new Error('MFA required'),{status:403});
   const {data:p,error}=await supabaseAdmin().from('profiles').select('role').eq('id',user.id).single();
   if(error||p?.role!=='admin') throw Object.assign(new Error('Admin access required'),{status:403});
@@ -10,6 +10,7 @@ async function admin(req){
 }
 export default async function handler(req,res){
   try{
+    if(req.method==='OPTIONS'){res.setHeader('Access-Control-Allow-Origin','https://shashi-code-web.github.io');res.setHeader('Access-Control-Allow-Headers','Authorization, Content-Type');res.setHeader('Access-Control-Allow-Methods','GET,POST,PATCH,OPTIONS');return res.status(204).end();}
     await admin(req);
     const db=supabaseAdmin();
     if(req.method==='GET'){
