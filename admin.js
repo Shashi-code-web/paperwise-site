@@ -54,15 +54,15 @@ async function loadAdmin(){
  const result=await response.json();
  if(!response.ok){message(result.error||'Administrator access denied');if(catalog)catalog.textContent='Unable to load products.';return;}
  message('Two-factor authentication verified. Administrator access granted.');
- try{
-  const stats=await adminApi('/api/admin/stats');
-  const metric=document.querySelectorAll('.metrics b');
-  if(metric[0])metric[0].textContent='₹'+(stats.netSalesPaise/100).toFixed(2);
-  if(metric[1])metric[1].textContent=String(stats.paidOrders);
- }catch(e){console.warn('Stats unavailable:',e.message);}
-
- document.querySelectorAll('.metrics span').forEach(el=>el.textContent='Live database figures where available');
- const metricLabels=document.querySelectorAll('.metrics span');if(metricLabels[2])metricLabels[2].textContent='Download tracking not configured';
+ const metrics=result.metrics||{};
+ const metric=document.querySelectorAll('.metrics b');
+ if(metric[0])metric[0].textContent='₹'+((metrics.netSalesPaise||0)/100).toFixed(2);
+ if(metric[1])metric[1].textContent=String(metrics.paidOrders||0);
+ if(metric[2])metric[2].textContent=String(metrics.downloadLinksIssued||0);
+ const metricLabels=document.querySelectorAll('.metrics span');
+ if(metricLabels[0])metricLabels[0].textContent=(metrics.paidOrders||0)+' paid orders';
+ if(metricLabels[1])metricLabels[1].textContent='Confirmed by payment webhook';
+ if(metricLabels[2])metricLabels[2].textContent='Expiring download links issued';
  if(!catalog)return;
  catalog.replaceChildren();
  if(!result.products?.length){catalog.textContent='No products yet.';return;}
