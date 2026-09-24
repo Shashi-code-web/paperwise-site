@@ -8,7 +8,7 @@ function showMfaForm(title,description,qr,action){
  const heading=document.createElement('strong');heading.textContent=title;
  const info=document.createElement('p');info.textContent=description;
  wrap.append(heading,info);
- if(qr){const img=document.createElement('img');img.src='data:image/svg+xml;base64,'+btoa(qr);img.alt='Scan this QR code in your authenticator app';img.style.cssText='display:block;max-width:200px;margin:12px auto';wrap.append(img);}
+ if(qr){const img=document.createElement('img');img.src=qr.startsWith('data:image/')?qr:qr.trimStart().startsWith('<svg')?'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(qr):'data:image/svg+xml;base64,'+qr;img.alt='Scan this QR code in your authenticator app';img.style.cssText='display:block;max-width:200px;margin:12px auto';wrap.append(img);}
  const code=document.createElement('input');code.type='text';code.inputMode='numeric';code.autocomplete='one-time-code';code.placeholder='6-digit authenticator code';code.maxLength=6;code.style.cssText='display:block;width:100%;padding:12px;box-sizing:border-box;margin:12px 0';
  const button=document.createElement('button');button.textContent='Verify code';button.className='button dark';
  const feedback=document.createElement('p');feedback.setAttribute('role','status');
