@@ -29,6 +29,13 @@ async function setupMfa(){
   });
   return false;
  }
+ // Supabase may retain an unverified enrollment after the user closes the QR screen.
+ // Remove that abandoned enrollment before creating a fresh QR code.
+ const pending=(factors.all||[]).filter(f=>f.factor_type==='totp'&&f.status==='unverified');
+ for(const factor of pending){
+  const {error:removeError}=await sb.auth.mfa.unenroll({factorId:factor.id});
+  if(removeError)throw new Error('An unfinished authenticator setup exists. '+removeError.message);
+ }
  const {data:enrolled,error:ee}=await sb.auth.mfa.enroll({factorType:'totp',friendlyName:'PaperWise Admin'});
  if(ee)throw ee;
  showMfaForm('Set up two-factor authentication','Scan this QR code with Google Authenticator, Microsoft Authenticator, or another TOTP app, then enter its six-digit code.',enrolled.totp.qr_code,async code=>{
