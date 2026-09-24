@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /admin.html
+Disallow: /api/
+Sitemap: https://shashi-code-web.github.io/paperwise-site/sitemap.xml
