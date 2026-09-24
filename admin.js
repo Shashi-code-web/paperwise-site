@@ -54,8 +54,15 @@ async function loadAdmin(){
  const result=await response.json();
  if(!response.ok){message(result.error||'Administrator access denied');if(catalog)catalog.textContent='Unable to load products.';return;}
  message('Two-factor authentication verified. Administrator access granted.');
- document.querySelectorAll('.metrics b').forEach(el=>el.textContent='—');
- document.querySelectorAll('.metrics span').forEach(el=>el.textContent='Not connected');
+ try{
+  const stats=await adminApi('/api/admin/stats');
+  const metric=document.querySelectorAll('.metrics b');
+  if(metric[0])metric[0].textContent='₹'+(stats.netSalesPaise/100).toFixed(2);
+  if(metric[1])metric[1].textContent=String(stats.paidOrders);
+ }catch(e){console.warn('Stats unavailable:',e.message);}
+
+ document.querySelectorAll('.metrics span').forEach(el=>el.textContent='Live database figures where available');
+ const metricLabels=document.querySelectorAll('.metrics span');if(metricLabels[2])metricLabels[2].textContent='Download tracking not configured';
  if(!catalog)return;
  catalog.replaceChildren();
  if(!result.products?.length){catalog.textContent='No products yet.';return;}
@@ -64,7 +71,19 @@ async function loadAdmin(){
   const title=document.createElement('b');title.textContent=p.title;
   const price=document.createElement('b');price.textContent='₹'+(p.price_paise/100).toFixed(2);
   const state=document.createElement('span');state.className='status';state.textContent=p.active?'Active':'Draft';
-  row.append(title,price,state);catalog.append(row);
+  const edit=document.createElement('button');edit.className='tiny-btn';edit.textContent='Edit';
+  edit.onclick=async()=>{
+   const newTitle=prompt('Product title',p.title);if(newTitle===null)return;
+   const newDescription=prompt('Description',p.description);if(newDescription===null)return;
+   const newPrice=prompt('Price in ₹',(p.price_paise/100).toFixed(2));if(newPrice===null)return;
+   const amount=Math.round(Number(newPrice)*100);
+   if(!newTitle.trim()||!newDescription.trim()||!Number.isInteger(amount)||amount<100||amount>1000000){alert('Enter a title, description, and price between ₹1 and ₹10,000.');return;}
+   try{await adminApi('/api/admin-products',{method:'PATCH',body:JSON.stringify({id:p.id,title:newTitle.trim(),description:newDescription.trim(),price_paise:amount})});await loadAdmin();}
+   catch(e){alert(e.message);}
+  };
+  const toggle=document.createElement('button');toggle.className='tiny-btn';toggle.textContent=p.active?'Unpublish':'Publish';
+  toggle.onclick=async()=>{try{await adminApi('/api/admin-products',{method:'PATCH',body:JSON.stringify({id:p.id,active:!p.active})});await loadAdmin();}catch(e){alert(e.message);}};
+  row.append(title,price,state,edit,toggle);catalog.append(row);
  }
 }
 document.querySelector('.cart-btn')?.addEventListener('click',async()=>{if(sb)await sb.auth.signOut();location.replace('index.html');});
