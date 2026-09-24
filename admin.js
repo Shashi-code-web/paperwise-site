@@ -68,5 +68,54 @@ async function loadAdmin(){
  }
 }
 document.querySelector('.cart-btn')?.addEventListener('click',async()=>{if(sb)await sb.auth.signOut();location.replace('index.html');});
-document.querySelector('.admin-panel .button')?.addEventListener('click',()=>alert('Private PDF upload is being configured. Do not share PDF files publicly.'));
+async function adminApi(path,options={}){
+ const {data:{session}}=await sb.auth.getSession();
+ if(!session)throw new Error('Sign in again');
+ const response=await fetch(apiBase+path,{...options,headers:{Authorization:'Bearer '+session.access_token,...(options.body?{'Content-Type':'application/json'}:{}),...(options.headers||{})}});
+ const data=await response.json().catch(()=>({}));
+ if(!response.ok)throw new Error(data.error||'Request failed');
+ return data;
+}
+function openProductForm(){
+ if(document.getElementById('productForm'))return;
+ const section=document.querySelector('.admin-panel');
+ const form=document.createElement('form');form.id='productForm';
+ form.style.cssText='padding:24px;margin:20px 0;border:1px solid #ddd;display:grid;gap:14px;background:#fff';
+ const heading=document.createElement('h3');heading.textContent='Add a new PDF edition';
+ const fields=[
+  ['productTitle','Title','text',true],
+  ['productDescription','Description','text',true],
+  ['productPrice','Price (₹)','number',true],
+  ['productFile','Private PDF (up to 50 MB)','file',true]
+ ];
+ const inputs={};
+ for(const [id,label,type,required] of fields){
+  const wrap=document.createElement('label');wrap.textContent=label;wrap.style.cssText='display:grid;gap:6px';
+  const input=document.createElement('input');input.id=id;input.type=type;input.required=required;input.style.cssText='padding:12px;width:100%;box-sizing:border-box';
+  if(type==='number'){input.min='1';input.max='10000';input.step='0.01';input.value='59';}
+  if(type==='file')input.accept='application/pdf,.pdf';
+  wrap.append(input);form.append(wrap);inputs[id]=input;
+ }
+ const activeWrap=document.createElement('label');const active=document.createElement('input');active.type='checkbox';active.checked=true;activeWrap.append(active,document.createTextNode(' Publish immediately'));form.append(activeWrap);
+ const button=document.createElement('button');button.className='button dark';button.type='submit';button.textContent='Upload and save product';
+ const status=document.createElement('p');status.setAttribute('role','status');
+ form.prepend(heading);form.append(button,status);section.insertBefore(form,document.getElementById('adminEmpty'));
+ form.onsubmit=async e=>{
+  e.preventDefault();button.disabled=true;status.textContent='Preparing secure upload…';
+  try{
+   const file=inputs.productFile.files[0];
+   if(!file||file.type!=='application/pdf'||file.size>52428800||file.size<1)throw new Error('Select a PDF smaller than 50 MB.');
+   const price=Math.round(Number(inputs.productPrice.value)*100);
+   if(!Number.isInteger(price)||price<100||price>1000000)throw new Error('Price must be between ₹1 and ₹10,000.');
+   const upload=await adminApi('/api/admin/upload',{method:'POST',body:JSON.stringify({name:file.name,size:file.size,type:file.type})});
+   status.textContent='Uploading PDF securely…';
+   const {error:storageError}=await sb.storage.from('private-pdfs').uploadToSignedUrl(upload.path,upload.token,file,{contentType:'application/pdf'});
+   if(storageError)throw storageError;
+   status.textContent='Saving product…';
+   await adminApi('/api/admin-products',{method:'POST',body:JSON.stringify({title:inputs.productTitle.value,description:inputs.productDescription.value,price_paise:price,pdf_asset_key:upload.path,active:active.checked})});
+   status.textContent='Product saved successfully.';form.remove();await loadAdmin();
+  }catch(err){status.textContent=err.message||'Unable to upload product';}finally{button.disabled=false;}
+ };
+}
+document.querySelector('.admin-panel .button')?.addEventListener('click',openProductForm);
 loadAdmin().catch(e=>{console.error(e);message(e.message||'Unable to initialize administrator verification.');});
