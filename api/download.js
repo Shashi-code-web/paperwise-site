@@ -1,11 +1,19 @@
-import {supabaseAdmin,requireUser,json} from './_lib/supabase.js';
+import {requireUser,supabaseAdmin,json} from './_lib/supabase.js';
 export default async function handler(req,res){
+ res.setHeader('Access-Control-Allow-Headers','Authorization, Content-Type');
+ res.setHeader('Access-Control-Allow-Methods','POST,OPTIONS');
+ if(req.method==='OPTIONS')return res.status(204).end();
  if(req.method!=='POST')return json(res,405,{error:'Method not allowed'});
- try{const user=await requireUser(req);const {productId}=req.body||{};const db=supabaseAdmin();
-  const {data:items,error}=await db.from('order_items').select('product_id,orders!inner(user_id,status)').eq('product_id',productId).eq('orders.user_id',user.id).eq('orders.status','paid').limit(1);
+ try{
+  const user=await requireUser(req),{productId}=req.body||{};
+  if(typeof productId!=='string')return json(res,400,{error:'Product required'});
+  const db=supabaseAdmin();
+  const {data:items,error}=await db.from('order_items').select('id,orders!inner(user_id,status)').eq('product_id',productId).eq('orders.user_id',user.id).eq('orders.status','paid').limit(1);
   if(error||!items?.length)return json(res,403,{error:'Purchase not verified'});
-  const {data:product}=await db.from('products').select('pdf_asset_key').eq('id',productId).single(); if(!product?.pdf_asset_key)return json(res,404,{error:'PDF not configured'});
-  const {data,error:se}=await db.storage.from('private-pdfs').createSignedUrl(product.pdf_asset_key,300,{download:true}); if(se||!data?.signedUrl)return json(res,500,{error:'Could not issue download link'});
-  return json(res,200,{url:data.signedUrl,expiresIn:300});
- }catch(e){return json(res,e.message==='Unauthorized'?401:500,{error:e.message})}
+  const {data:product,error:pe}=await db.from('products').select('pdf_asset_key').eq('id',productId).single();
+  if(pe||!product?.pdf_asset_key)return json(res,404,{error:'PDF unavailable'});
+  const {data,error:se}=await db.storage.from('private-pdfs').createSignedUrl(product.pdf_asset_key,120,{download:true});
+  if(se||!data?.signedUrl)return json(res,500,{error:'Unable to issue download link'});
+  return json(res,200,{url:data.signedUrl,expiresIn:120});
+ }catch(e){return json(res,e.status||500,{error:e.status?e.message:'Unable to prepare download'});}
 }
