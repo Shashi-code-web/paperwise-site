@@ -12,8 +12,9 @@ export default async function handler(req,res){
   if(error||!items?.length)return json(res,403,{error:'Purchase not verified'});
   const {data:product,error:pe}=await db.from('products').select('pdf_asset_key').eq('id',productId).single();
   if(pe||!product?.pdf_asset_key)return json(res,404,{error:'PDF unavailable'});
-  const {data,error:se}=await db.storage.from('private-pdfs').createSignedUrl(product.pdf_asset_key,120,{download:true});
+  const {data,error:se}=await db.storage.from('private-pdfs').createSignedUrl(product.pdf_asset_key,600,{download:true});
   if(se||!data?.signedUrl)return json(res,500,{error:'Unable to issue download link'});
-  return json(res,200,{url:data.signedUrl,expiresIn:120});
+  await db.from('download_tokens').insert({order_item_id:items[0].id,expires_at:new Date(Date.now()+600000).toISOString()});
+  return json(res,200,{url:data.signedUrl,expiresIn:600});
  }catch(e){return json(res,e.status||500,{error:e.status?e.message:'Unable to prepare download'});}
 }
