@@ -11,9 +11,18 @@ async function loadAdmin(){
   document.querySelector('.mfa').textContent='Administrator access verified';
   document.querySelectorAll('.metrics b').forEach(x=>x.textContent='—');
   document.querySelectorAll('.metrics span').forEach(x=>x.textContent='Not connected');
-  const rows=document.querySelectorAll('.admin-row:not(.header)');
-  rows.forEach(row=>row.style.display='none');
-  (d.products||[]).slice(0,rows.length).forEach((p,i)=>{rows[i].style.display='';rows[i].querySelector('b').textContent=p.title;rows[i].querySelectorAll('b')[1].textContent='₹'+(p.price_paise/100);rows[i].querySelector('.status').textContent=p.active?'Active':'Draft';});
+  const holder=document.getElementById('adminEmpty');
+  if(holder){
+    holder.textContent='';
+    if(!d.products?.length){holder.textContent='No products yet.';}
+    else for(const p of d.products){
+      const row=document.createElement('div');row.className='admin-row';
+      const title=document.createElement('b');title.textContent=p.title;
+      const price=document.createElement('b');price.textContent='₹'+(p.price_paise/100).toFixed(2);
+      const state=document.createElement('span');state.className='status';state.textContent=p.active?'Active':'Draft';
+      row.append(title,price,state);holder.append(row);
+    }
+  }
 }
 document.querySelector('.cart-btn')?.addEventListener('click',async()=>{if(sb)await sb.auth.signOut();location.href='index.html'});
 document.querySelector('.admin-panel .button')?.addEventListener('click',()=>alert('Product creation is protected by Supabase MFA. Upload the PDF to private Supabase Storage first, then create the product record through the authenticated admin API.'));
