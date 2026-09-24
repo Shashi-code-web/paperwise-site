@@ -6,9 +6,17 @@ export default async function handler(req,res){
     await requireAdmin(req);
     const db=supabaseAdmin();
     if(req.method==='GET'){
-      const {data,error}=await db.from('products').select('*').order('updated_at',{ascending:false});
+      const [{data:products,error},{data:orders,error:oe},{count:downloadCount,error:de}]=await Promise.all([
+        db.from('products').select('*').order('updated_at',{ascending:false}),
+        db.from('orders').select('amount_paise,status'),
+        db.from('download_tokens').select('id',{count:'exact',head:true})
+      ]);
       if(error) throw error;
-      return json(res,200,{products:data||[]});
+      if(oe) throw oe;
+      if(de) throw de;
+      const paidOrders=(orders||[]).filter(o=>o.status==='paid');
+      const netSalesPaise=paidOrders.reduce((sum,o)=>sum+o.amount_paise,0);
+      return json(res,200,{products:products||[],metrics:{netSalesPaise,paidOrders:paidOrders.length,downloadLinksIssued:downloadCount||0}});
     }
     if(req.method==='POST'){
       const body=typeof req.body==='string'?JSON.parse(req.body):req.body||{};
