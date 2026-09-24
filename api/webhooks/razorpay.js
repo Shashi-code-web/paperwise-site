@@ -1,29 +1,24 @@
 import crypto from 'node:crypto';
-import { adminDb, json } from '../_lib/supabase.js';
-import { errorResponse } from '../_lib/http.js';
-
-function validSignature(rawBody, signature) {
-  const expected = crypto.createHmac('sha256', process.env.RAZORPAY_WEBHOOK_SECRET).update(rawBody).digest('hex');
-  if (!signature || signature.length !== expected.length) return false;
-  return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
-}
-
-export const config = { api: { bodyParser: false } };
-export default async function handler(request) {
-  if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
-  try {
-    const rawBody = typeof request.body === 'string' ? request.body : JSON.stringify(request.body || {});
-    if (!validSignature(rawBody, request.headers['x-razorpay-signature'])) return json({ error: 'Invalid webhook signature' }, 401);
-    const event = JSON.parse(rawBody);
-    const eventId = event.payload?.payment?.entity?.id || event.created_at + ':' + event.event;
-    const { error: eventError } = await adminDb.from('webhook_events').insert({ provider_event_id: eventId, payload_hash: crypto.createHash('sha256').update(rawBody).digest('hex') });
-    if (eventError?.code === '23505') return json({ received: true }); // already processed
-    if (eventError) throw eventError;
-    if (event.event === 'payment.captured') {
-      const payment = event.payload.payment.entity;
-      const { error } = await adminDb.from('orders').update({ status: 'paid', provider_payment_id: payment.id, paid_at: new Date().toISOString() }).eq('provider_order_id', payment.order_id).eq('amount_paise', payment.amount);
-      if (error) throw error;
-    }
-    return json({ received: true });
-  } catch (error) { return errorResponse(error); }
+import {supabaseAdmin,json} from '../_lib/supabase.js';
+export const config={api:{bodyParser:false}};
+async function raw(req){const chunks=[];for await(const chunk of req)chunks.push(Buffer.isBuffer(chunk)?chunk:Buffer.from(chunk));return Buffer.concat(chunks);}
+export default async function handler(req,res){
+ if(req.method!=='POST')return json(res,405,{error:'Method not allowed'});
+ try{
+  if(!process.env.RAZORPAY_WEBHOOK_SECRET)return json(res,503,{error:'Webhook not configured'});
+  const body=await raw(req),sig=req.headers['x-razorpay-signature']||'';
+  const expected=crypto.createHmac('sha256',process.env.RAZORPAY_WEBHOOK_SECRET).update(body).digest('hex');
+  if(typeof sig!=='string'||sig.length!==expected.length||!crypto.timingSafeEqual(Buffer.from(sig),Buffer.from(expected)))return json(res,401,{error:'Invalid signature'});
+  const event=JSON.parse(body.toString('utf8'));
+  if(event.event!=='payment.captured')return json(res,200,{received:true});
+  const payment=event.payload?.payment?.entity;
+  if(!payment?.id||!payment?.order_id||!Number.isInteger(payment.amount)||payment.currency!=='INR')return json(res,400,{error:'Invalid payment payload'});
+  const db=supabaseAdmin();
+  const {data:order,error:oe}=await db.from('orders').select('id,status').eq('provider_order_id',payment.order_id).eq('amount_paise',payment.amount).eq('currency','INR').maybeSingle();
+  if(oe)throw oe;
+  if(!order)return json(res,200,{received:true});
+  const {error:ue}=await db.from('orders').update({status:'paid',provider_payment_id:payment.id,paid_at:new Date().toISOString()}).eq('id',order.id).eq('status','pending');
+  if(ue)throw ue;
+  return json(res,200,{received:true});
+ }catch(e){console.error('Webhook processing failed:',e.message);return json(res,500,{error:'Webhook processing failed'});}
 }
