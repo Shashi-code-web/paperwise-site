@@ -87,9 +87,9 @@ async function loadAdmin(){
  if(error||!session){location.replace('index.html?adminLogin=1');return;}
  const verified=await setupMfa();
  if(!verified){if(catalog)catalog.textContent='Complete two-factor verification to view products.';return;}
- const response=await fetch(apiBase+'/api/admin-products',{headers:{Authorization:'Bearer '+(await sb.auth.getSession()).data.session.access_token}});
- const result=await response.json();
- if(!response.ok){message(result.error||'Administrator access denied');if(catalog)catalog.textContent='Unable to load products.';return;}
+ let result;
+ try{result=await adminApi('/api/admin-products');}
+ catch(e){message(e.message||'Administrator access denied');if(catalog)catalog.textContent='Unable to load products.';return;}
  message('Two-factor authentication verified. Administrator access granted.');
  const metrics=result.metrics||{};
  const metric=document.querySelectorAll('.metrics b');
