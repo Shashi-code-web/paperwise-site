@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <div class="announcement">Instant access after secure payment <span>•</span> Made for curious minds</div>
+  <div class="announcement">Browse digital editions · Checkout temporarily unavailable <span>•</span> Made for curious minds</div>
   <header class="nav"><a href="#home" class="brand">paper<span>wise</span>.</a><nav><a href="#library">Library</a><a href="#how">How it works</a><a href="#about">About</a></nav><div class="nav-actions"><button class="icon-btn" id="accountBtn" aria-label="Account">◎</button><button class="cart-btn" id="cartBtn">Bag <b id="cartCount">0</b></button></div></header>
 
   <main id="home">
@@ -24,18 +24,18 @@
 
     <section class="story" id="how"><div class="story-visual"><div class="circle"></div><div class="quote-card"><span>“</span><p>A good page creates a little more room to think.</p><small>— our guiding thought</small></div></div><div class="story-copy"><p class="eyebrow">A MORE INTENTIONAL INBOX</p><h2>Read it today.<br><em>Keep it for years.</em></h2><p>Every Paperwise edition is designed to be useful on a screen, lovely when printed, and worth returning to when life gets noisy.</p><div class="perks"><span><b>01</b> Thoughtfully researched</span><span><b>02</b> Beautifully designed</span><span><b>03</b> Yours to keep</span></div></div></section>
 
-    <section class="steps"><p class="eyebrow">SIMPLE BY DESIGN</p><h2>From good choice to good read.</h2><div class="step-grid"><article><b>01</b><h3>Find your edition</h3><p>Browse concise guides made for everyday questions.</p></article><article><b>02</b><h3>Checkout securely</h3><p>Pay safely via our trusted payment partner.</p></article><article><b>03</b><h3>Start reading</h3><p>Your private download is ready once payment is confirmed.</p></article></div></section>
+    <section class="steps"><p class="eyebrow">SIMPLE BY DESIGN</p><h2>From good choice to good read.</h2><div class="step-grid"><article><b>01</b><h3>Find your edition</h3><p>Browse concise guides made for everyday questions.</p></article><article><b>02</b><h3>Checkout securely</h3><p>Payments will be available after a new provider is configured.</p></article><article><b>03</b><h3>Start reading</h3><p>Your private download is ready once payment is confirmed.</p></article></div></section>
 
     <section class="newsletter" id="about"><p class="eyebrow">THE OCCASIONAL NOTE</p><h2>A little clarity,<br><em>sent occasionally.</em></h2><p>Fresh editions, useful links, and nothing noisy.</p><form id="newsletterForm"><input type="email" aria-label="Email address" placeholder="Your email address" required><button class="button cream">Join the list →</button></form><small>Newsletter sign-up is coming soon.</small></section>
   </main>
 
   <footer><a href="#home" class="brand">paper<span>wise</span>.</a><div class="footer-links"><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><a href="refunds.html">Refunds</a><a href="contact.html">Contact</a></div><p>© 2026 Paperwise Studio</p></footer>
 
-  <aside class="drawer" id="cartDrawer" aria-hidden="true"><div class="drawer-head"><h2>Your bag</h2><button class="close" data-close="cartDrawer">×</button></div><div class="cart-items" id="cartItems"><div class="empty">Your bag is waiting for a good read.</div></div><div class="drawer-bottom"><div class="total"><span>Total</span><b id="cartTotal">₹0</b></div><button class="button dark full" id="checkoutBtn">Secure checkout <span>→</span></button><small>Payments are processed securely. Card details never touch Paperwise.</small></div></aside>
+  <aside class="drawer" id="cartDrawer" aria-hidden="true"><div class="drawer-head"><h2>Your bag</h2><button class="close" data-close="cartDrawer">×</button></div><div class="cart-items" id="cartItems"><div class="empty">Your bag is waiting for a good read.</div></div><div class="drawer-bottom"><div class="total"><span>Total</span><b id="cartTotal">₹0</b></div><button class="button dark full" id="checkoutBtn">Checkout unavailable <span>→</span></button><small>Payments are temporarily unavailable. No orders can be placed.</small></div></aside>
   <aside class="drawer account-drawer" id="accountDrawer" aria-hidden="true"><div class="drawer-head"><h2>Your account</h2><button class="close" data-close="accountDrawer">×</button></div><div class="account-content" id="accountContent"></div></aside><div class="overlay" id="overlay"></div>
 
   <dialog id="previewDialog"><button class="close dialog-close" id="closePreview">×</button><div class="preview-page"><p>PAPERWISE / EDITION</p><h2 id="previewTitle">Make Space For It</h2><div class="preview-lines"></div><blockquote id="previewQuote">“A little space is often all a good idea needs.”</blockquote><div class="preview-lines short"></div><small>Product details • PDF preview coming soon</small></div></dialog>
   <div class="toast" id="toast" role="status"></div>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="config.js?v=8"></script><script src="https://checkout.razorpay.com/v1/checkout.js"></script><script src="app.js?v=10"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="config.js?v=8"></script><script src="app.js?v=11"></script>
 </body>
 </html>
