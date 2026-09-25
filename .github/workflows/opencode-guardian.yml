@@ -1,0 +1,57 @@
+name: OpenCode Paperwise Guardian
+
+on:
+  workflow_dispatch:
+    inputs:
+      prompt:
+        description: "Guardian task to run"
+        required: true
+        default: "Run the Paperwise cross-service health review and report confirmed issues. Do not make production changes unless explicitly requested."
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  id-token: write
+
+concurrency:
+  group: opencode-paperwise-guardian
+  cancel-in-progress: false
+
+jobs:
+  guardian:
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (
+        (contains(github.event.comment.body, '/opencode') || contains(github.event.comment.body, '/oc')) &&
+        (
+          github.event.comment.user.login == github.repository_owner ||
+          github.event.comment.author_association == 'OWNER'
+        )
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Run OpenCode Guardian
+        uses: anomalyco/opencode/github@latest
+        env:
+          # Configure only the provider secret that matches OPENCODE_MODEL.
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GOOGLE_GENERATIVE_AI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          model: ${{ vars.OPENCODE_MODEL }}
+          use_github_token: true
+          prompt: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.prompt || '' }}
