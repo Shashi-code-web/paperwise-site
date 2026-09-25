@@ -1,8 +1,9 @@
 import { requireAdmin, supabaseAdmin, json,cors } from './_lib/supabase.js';
 
 export default async function handler(req,res){
+  cors(req,res);
   try{
-    if(req.method==='OPTIONS'){cors(req,res);return res.status(204).end();}
+    if(req.method==='OPTIONS')return res.status(204).end();
     await requireAdmin(req);
     const db=supabaseAdmin();
     if(req.method==='GET'){
