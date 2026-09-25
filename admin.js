@@ -174,5 +174,5 @@ function openProductForm(){
   }catch(err){status.textContent=err.message||'Unable to upload product';}finally{button.disabled=false;}
  };
 }
-document.querySelector('.admin-panel .button')?.addEventListener('click',openProductForm);
+document.getElementById('uploadPdfButton')?.addEventListener('click',openProductForm);
 loadAdmin().catch(e=>{console.error(e);message(e.message||'Unable to initialize administrator verification.');});
