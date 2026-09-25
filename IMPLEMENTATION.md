@@ -1,11 +1,13 @@
 # Paperwise implementation notes
 
+This storefront has checkout temporarily disabled while a new payment provider is configured. Any separately deployed payment backend must also have its old Razorpay routes and secrets disabled. This repository change does not disable a separate backend or merchant account.
+
 This storefront is a front-end demonstration. Its `Secure checkout` button must be connected to server routes before it can accept payments or deliver files.
 
 ## Recommended production design
 
 - Use **Razorpay** (or Cashfree) for India-supported payments. Create orders only from a server endpoint, in INR, with the authoritative product price (₹59), and open the provider checkout using only its publishable key.
-- Merchant bank-account linking, KYC, payout settings, and provider verification belong in the merchant's Razorpay/Cashfree dashboard. Do not collect bank information on this public site.
+- Merchant bank-account linking, KYC, payout settings, and provider verification belong in the merchant's payment provider dashboard. Do not collect bank information on this public site.
 - On the server, verify the payment signature and also validate the provider webhook signature using the webhook secret held only in environment variables. Make fulfillment idempotent by recording the provider event/payment ID before issuing access.
 - Store source PDFs in a private bucket (for example, S3/R2 private storage), never under the public web root. After the verified webhook marks an order `paid`, issue a short-lived signed download URL or a single-use download token from an authenticated server endpoint.
 - The download endpoint must check the signed-in customer owns the paid order. Rate-limit it and log issuance/download attempts. Do not generate a download from browser code.
@@ -28,7 +30,7 @@ This storefront is a front-end demonstration. Its `Secure checkout` button must 
 ## Routes and access controls
 
 - `POST /api/checkout`: authenticated user; validates cart/product IDs and prices server-side; creates provider order.
-- `POST /api/webhooks/razorpay`: public endpoint; raw-body HMAC verification before processing; idempotent.
+- `POST /api/webhooks/payment-provider`: public endpoint; raw-body HMAC verification before processing; idempotent.
 - `GET /api/me/orders`: authenticated user; returns only their orders.
 - `POST /api/downloads/:orderItemId`: authenticated owner of a `paid` order; returns an expiring signed URL.
 - `/admin/*`: administrator role plus TOTP/WebAuthn second factor, secure session cookies, CSRF protection, audit logging and rate limits. Admins upload PDFs to private storage, edit product content/₹ price, and view/manage sales; they never see card details.
