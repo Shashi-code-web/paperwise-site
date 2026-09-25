@@ -47,7 +47,7 @@ function renderCart(){
     const remove=document.createElement('button');remove.className='remove';remove.textContent='Remove';remove.dataset.remove=String(i);
     row.append(mini,meta,remove);$('#cartItems').append(row);
   });
-  $('#checkoutBtn').disabled=!items.length;$('#checkoutBtn').style.opacity=items.length?'1':'.45';
+  $('#checkoutBtn').disabled=true;$('#checkoutBtn').textContent='Checkout unavailable';$('#checkoutBtn').style.opacity='.45';
 }
 function drawer(id,on=true){$('#'+id).classList.toggle('open',on);$('#overlay').classList.toggle('open',on);$('#'+id).setAttribute('aria-hidden',!on);}
 async function session(){if(!sb)return null;return (await sb.auth.getSession()).data.session||null;}
@@ -90,25 +90,9 @@ async function renderAccount(){
   }catch(e){const err=document.createElement('p');err.className='login-note';err.textContent=e.message;area.append(err);}
 }
 async function startCheckout(){
-  if(!cart.length)return;
-  if(!sb){showToast('Account service is unavailable.');return;}
-  const s=await session();
-  if(!s){drawer('cartDrawer',false);drawer('accountDrawer',true);renderAccountLogin();showToast('Sign in to continue to checkout.');return;}
-  if(!window.Razorpay){showToast('Payment checkout is loading. Try again in a moment.');return;}
-  const button=$('#checkoutBtn');button.disabled=true;button.textContent='Preparing checkout…';
-  try{
-    const data=await apiFetch('/api/checkout',{method:'POST',body:JSON.stringify({productIds:[...new Set(cart)]})});
-    const options={
-      key:data.keyId,order_id:data.razorpayOrderId,amount:data.amount,currency:data.currency,name:'Paperwise',
-      description:'Digital PDF purchase',
-      prefill:{email:s.user.email||''},
-      theme:{color:'#132133'},
-      handler:async()=>{cart=[];save();showToast('Payment submitted. Your library updates after payment confirmation.');setTimeout(()=>{drawer('accountDrawer',true);renderAccount();},1800);},
-      modal:{ondismiss:()=>{button.disabled=false;button.textContent='Secure checkout →';}}
-    };
-    new window.Razorpay(options).open();
-  }catch(e){showToast(e.message);button.disabled=false;button.textContent='Secure checkout →';}
+  showToast('Checkout is temporarily unavailable while we configure a new payment provider.');
 }
+
 async function loadProducts(){
   try{const res=await fetch(API+'/api/products');const data=await res.json();if(!res.ok)throw new Error(data.error||'Unable to load editions');products=(data.products||[]);renderProducts();renderCart();}
   catch(e){grid.innerHTML='<div class="empty" style="grid-column:1/-1">The catalogue is temporarily unavailable. Please try again shortly.</div>';showToast(e.message);}
