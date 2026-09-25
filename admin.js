@@ -44,6 +44,43 @@ async function setupMfa(){
  });
  return false;
 }
+async function loadManualOrders(){
+ const area=document.getElementById('manualOrdersList');if(!area)return;
+ area.textContent='Loading manual payment submissions…';
+ try{
+  const data=await adminApi('/api/admin-manual-orders');
+  area.replaceChildren();
+  if(!data.orders?.length){area.textContent='No manual payments submitted yet.';return;}
+  for(const order of data.orders){
+   const card=document.createElement('article');card.style.cssText='border:1px solid #ddd;border-radius:12px;padding:16px;margin:12px 0;background:#fff;display:grid;gap:8px';
+   const title=document.createElement('strong');title.textContent=(order.order_items||[]).map(i=>i.products?.title||'PDF').join(', ')||'PDF order';
+   const info=document.createElement('p');info.style.cssText='overflow-wrap:anywhere;margin:0';
+   info.textContent='₹'+(order.amount_paise/100).toFixed(2)+' · '+order.status.toUpperCase()+' · Transaction ID: '+order.manual_payment_reference;
+   const customer=document.createElement('small');customer.textContent='Customer ID: '+order.user_id+' · Submitted: '+(order.manual_submitted_at?new Date(order.manual_submitted_at).toLocaleString():'—');
+   card.append(title,info,customer);
+   if(order.status==='pending'){
+    const verifyLabel=document.createElement('label');verifyLabel.style.cssText='display:flex;align-items:center;gap:8px';
+    const check=document.createElement('input');check.type='checkbox';
+    verifyLabel.append(check,document.createTextNode('I independently verified the matching transaction and amount in my PhonePe account.'));
+    const actions=document.createElement('div');actions.style.cssText='display:flex;gap:8px;flex-wrap:wrap';
+    for(const [action,label] of [['approve','Approve payment & unlock PDF'],['reject','Reject payment']]){
+     const btn=document.createElement('button');btn.className='tiny-btn';btn.textContent=label;
+     btn.onclick=async()=>{
+      if(action==='approve'&&!check.checked){alert('Verify the payment in your PhonePe account and tick the confirmation box first.');return;}
+      if(!window.confirm(action==='approve'?'Approve this verified payment and unlock the PDF?':'Reject this payment submission?'))return;
+      actions.querySelectorAll('button').forEach(b=>b.disabled=true);
+      try{await adminApi('/api/admin-manual-orders',{method:'POST',body:JSON.stringify({orderId:order.id,action})});await loadAdmin();}
+      catch(e){alert(e.message);actions.querySelectorAll('button').forEach(b=>b.disabled=false);}
+     };
+     actions.append(btn);
+    }
+    card.append(verifyLabel,actions);
+   }
+   area.append(card);
+  }
+ }catch(e){area.textContent=e.message||'Unable to load manual payments.';}
+}
+document.getElementById('refreshManualOrders')?.addEventListener('click',loadManualOrders);
 async function loadAdmin(){
  if(!sb||!apiBase){message('Missing browser configuration.');return;}
  const {data:{session},error}=await sb.auth.getSession();
@@ -61,8 +98,9 @@ async function loadAdmin(){
  if(metric[2])metric[2].textContent=String(metrics.downloadLinksIssued||0);
  const metricLabels=document.querySelectorAll('.metrics span');
  if(metricLabels[0])metricLabels[0].textContent=(metrics.paidOrders||0)+' paid orders';
- if(metricLabels[1])metricLabels[1].textContent='Confirmed by payment webhook';
+ if(metricLabels[1])metricLabels[1].textContent='Approved by admin';
  if(metricLabels[2])metricLabels[2].textContent='Expiring download links issued';
+ await loadManualOrders();
  if(!catalog)return;
  catalog.replaceChildren();
  if(!result.products?.length){catalog.textContent='No products yet.';return;}
