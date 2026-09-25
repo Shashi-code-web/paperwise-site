@@ -13,6 +13,8 @@ export default async function handler(req,res){
   const reference=String(transactionId||'').trim().toUpperCase();
   if(!/^[A-Z0-9]{10,35}$/.test(reference))return json(res,400,{error:'Enter a valid 10–35 character UPI transaction ID'});
   const db=supabaseAdmin();
+  const {data:settings,error:settingsError}=await db.from('manual_payment_settings').select('enabled').eq('id',1).single();
+  if(settingsError||!settings?.enabled)return json(res,503,{error:'Manual checkout is currently disabled by the administrator'});
   const {data:products,error}=await db.from('products').select('id,title,price_paise').in('id',productIds).eq('active',true);
   if(error||products?.length!==productIds.length)return json(res,400,{error:'Some products are unavailable'});
   const amount=products.reduce((sum,p)=>sum+p.price_paise,0);
