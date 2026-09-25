@@ -2,7 +2,8 @@ const API=(window.PAPERWISE_API_BASE||'').replace(/\/$/,'');
 const sb=window.supabase&&window.PAPERWISE_SUPABASE_URL&&window.PAPERWISE_SUPABASE_ANON_KEY
   ?window.supabase.createClient(window.PAPERWISE_SUPABASE_URL,window.PAPERWISE_SUPABASE_ANON_KEY):null;
 let products=[];
-let cart=JSON.parse(localStorage.getItem('paperwise-cart')||'[]');
+let cart=[];
+try{const stored=JSON.parse(localStorage.getItem('paperwise-cart')||'[]');cart=Array.isArray(stored)?stored.filter(id=>typeof id==='string'):[];}catch{localStorage.removeItem('paperwise-cart');}
 const $=s=>document.querySelector(s),grid=$('#productGrid'),toast=$('#toast');
 
 function showToast(message){toast.textContent=message;toast.classList.add('show');setTimeout(()=>toast.classList.remove('show'),2800);}
@@ -59,6 +60,7 @@ async function apiFetch(path,options={}){
 function renderAccountLogin(){
   $('#accountContent').replaceChildren();
   const note=document.createElement('p');note.className='login-note';note.textContent='Create an account or sign in to access purchases and downloads.';
+  if(!sb){note.textContent='Account sign-in is temporarily unavailable.';$('#accountContent').append(note);return;}
   const email=document.createElement('input');email.type='email';email.placeholder='Email address';email.autocomplete='email';
   const pass=document.createElement('input');pass.type='password';pass.placeholder='Password';pass.autocomplete='current-password';
   const signIn=document.createElement('button');signIn.className='button dark full';signIn.textContent='Sign in';
@@ -133,12 +135,13 @@ async function loadProducts(){
 }
 renderProducts();renderCart();loadProducts();
 document.addEventListener('click',e=>{
-  const id=e.target.dataset.add;
+  const target=e.target.closest('[data-add],[data-preview],[data-remove],[data-close]');if(!target)return;
+  const id=target.dataset.add;
   if(id){if(!cart.includes(id)){cart.push(id);save();showToast('Added to your bag.');}else showToast('Already in your bag.');return;}
-  const pre=e.target.dataset.preview;
+  const pre=target.dataset.preview;
   if(pre){const p=productById(pre);if(!p)return;$('#previewTitle').textContent=p.title;$('#previewQuote').textContent=p.description;$('#previewDialog').showModal();return;}
-  if(e.target.dataset.remove!==undefined){cart.splice(Number(e.target.dataset.remove),1);save();}
-  if(e.target.dataset.close)drawer(e.target.dataset.close,false);
+  if(target.dataset.remove!==undefined){cart.splice(Number(target.dataset.remove),1);save();}
+  if(target.dataset.close)drawer(target.dataset.close,false);
 });
 $('#cartBtn').onclick=()=>drawer('cartDrawer');
 $('#accountBtn').onclick=async()=>{drawer('accountDrawer');await renderAccount();};
@@ -146,7 +149,7 @@ $('#overlay').onclick=()=>{drawer('cartDrawer',false);drawer('accountDrawer',fal
 $('#closePreview').onclick=()=>$('#previewDialog').close();
 $('#viewAll').onclick=()=>document.querySelector('#library').scrollIntoView({behavior:'smooth'});
 $('#checkoutBtn').onclick=startCheckout;
-$('#newsletterForm').onsubmit=e=>{e.preventDefault();e.target.reset();showToast('You’re on the list — welcome.');};
+$('#newsletterForm').onsubmit=e=>{e.preventDefault();showToast('Newsletter sign-up is coming soon.');};
 
 (function(){
   const params=new URLSearchParams(window.location.search);
