@@ -8,7 +8,6 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.1",
-    "razorpay": "^2.9.6",
     "raw-body": "^2.5.2"
   }
 }
