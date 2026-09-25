@@ -135,7 +135,8 @@ async function adminApi(path,options={}){
 }
 function openProductForm(){
  if(document.getElementById('productForm'))return;
- const section=document.querySelector('.admin-panel');
+ const section=document.getElementById('catalogPanel');
+ if(!section){message('Catalogue panel is unavailable. Please refresh the page.');return;}
  const form=document.createElement('form');form.id='productForm';
  form.style.cssText='padding:24px;margin:20px 0;border:1px solid #ddd;display:grid;gap:14px;background:#fff';
  const heading=document.createElement('h3');heading.textContent='Add a new PDF edition';
@@ -161,17 +162,17 @@ function openProductForm(){
   e.preventDefault();button.disabled=true;status.textContent='Preparing secure upload…';
   try{
    const file=inputs.productFile.files[0];
-   if(!file||file.type!=='application/pdf'||file.size>52428800||file.size<1)throw new Error('Select a PDF smaller than 50 MB.');
+   if(!file||(!file.name.toLowerCase().endsWith('.pdf')&&file.type!=='application/pdf')||file.size>52428800||file.size<1)throw new Error('Select a PDF smaller than 50 MB.');
    const price=Math.round(Number(inputs.productPrice.value)*100);
    if(!Number.isInteger(price)||price<100||price>1000000)throw new Error('Price must be between ₹1 and ₹10,000.');
-   const upload=await adminApi('/api/admin/upload',{method:'POST',body:JSON.stringify({name:file.name,size:file.size,type:file.type})});
+   const upload=await adminApi('/api/admin/upload',{method:'POST',body:JSON.stringify({name:file.name,size:file.size,type:'application/pdf'})});
    status.textContent='Uploading PDF securely…';
-   const {error:storageError}=await sb.storage.from('private-pdfs').uploadToSignedUrl(upload.path,upload.token,file,{contentType:'application/pdf'});
+   const {error:storageError}=await sb.storage.from('private-pdfs').uploadToSignedUrl(upload.path,upload.token,file,{contentType:'application/pdf',upsert:false});
    if(storageError)throw storageError;
    status.textContent='Saving product…';
    await adminApi('/api/admin-products',{method:'POST',body:JSON.stringify({title:inputs.productTitle.value,description:inputs.productDescription.value,price_paise:price,pdf_asset_key:upload.path,active:active.checked})});
    status.textContent='Product saved successfully.';form.remove();await loadAdmin();
-  }catch(err){status.textContent=err.message||'Unable to upload product';}finally{button.disabled=false;}
+  }catch(err){status.textContent='Upload failed: '+(err.message||'Please try again.');}finally{button.disabled=false;}
  };
 }
 document.getElementById('uploadPdfButton')?.addEventListener('click',openProductForm);
