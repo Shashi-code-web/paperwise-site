@@ -1,8 +1,7 @@
 import crypto from 'node:crypto';
-import {requireAdmin,supabaseAdmin,json} from '../_lib/supabase.js';
-const cors=(res)=>{res.setHeader('Access-Control-Allow-Origin','https://shashi-code-web.github.io');res.setHeader('Access-Control-Allow-Headers','Authorization, Content-Type');res.setHeader('Access-Control-Allow-Methods','POST,OPTIONS');};
+import {requireAdmin,supabaseAdmin,json,cors} from '../_lib/supabase.js';
 export default async function handler(req,res){
- cors(res);
+ cors(req,res);
  if(req.method==='OPTIONS')return res.status(204).end();
  if(req.method!=='POST')return json(res,405,{error:'Method not allowed'});
  try{
