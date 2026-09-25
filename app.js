@@ -61,14 +61,39 @@ function renderAccountLogin(){
   $('#accountContent').replaceChildren();
   const note=document.createElement('p');note.className='login-note';note.textContent='Create an account or sign in to access purchases and downloads.';
   if(!sb){note.textContent='Account sign-in is temporarily unavailable.';$('#accountContent').append(note);return;}
-  const email=document.createElement('input');email.type='email';email.placeholder='Email address';email.autocomplete='email';
-  const pass=document.createElement('input');pass.type='password';pass.placeholder='Password';pass.autocomplete='current-password';
-  const signIn=document.createElement('button');signIn.className='button dark full';signIn.textContent='Sign in';
-  const signUp=document.createElement('button');signUp.className='button cream full';signUp.style.marginTop='10px';signUp.textContent='Create account';
-  const status=document.createElement('p');status.className='login-note';
-  signIn.onclick=async()=>{status.textContent='Signing in…';try{const {error}=await sb.auth.signInWithPassword({email:email.value.trim(),password:pass.value});if(error)throw error;await renderAccount();}catch(e){status.textContent=e.message||'Sign in failed';}};
-  signUp.onclick=async()=>{status.textContent='Creating account…';try{const {data,error}=await sb.auth.signUp({email:email.value.trim(),password:pass.value});if(error)throw error;status.textContent=data.session?'Account created.':'Account created. Check your email if confirmation is required.';if(data.session)await renderAccount();}catch(e){status.textContent=e.message||'Sign up failed';}};
-  $('#accountContent').append(note,email,pass,signIn,signUp,status);
+  const form=document.createElement('form');form.noValidate=true;
+  const email=document.createElement('input');email.type='email';email.placeholder='Email address';email.autocomplete='email';email.required=true;email.maxLength=254;
+  const pass=document.createElement('input');pass.type='password';pass.placeholder='Password (at least 6 characters)';pass.autocomplete='new-password';pass.required=true;pass.minLength=6;
+  const signIn=document.createElement('button');signIn.type='button';signIn.className='button dark full';signIn.textContent='Sign in';
+  const signUp=document.createElement('button');signUp.type='submit';signUp.className='button cream full';signUp.style.marginTop='10px';signUp.textContent='Create account';
+  const status=document.createElement('p');status.className='login-note';status.setAttribute('role','status');
+  function validate(){
+    const address=email.value.trim();
+    if(!address||!email.checkValidity()){status.textContent='Enter a valid email address.';email.focus();return null;}
+    if(pass.value.length<6){status.textContent='Enter a password of at least 6 characters.';pass.focus();return null;}
+    return {email:address,password:pass.value};
+  }
+  function busy(value){signIn.disabled=value;signUp.disabled=value;}
+  signIn.onclick=async()=>{
+    const credentials=validate();if(!credentials)return;
+    busy(true);status.textContent='Signing in…';
+    try{const {error}=await sb.auth.signInWithPassword(credentials);if(error)throw error;await renderAccount();}
+    catch(e){status.textContent=e.message||'Sign in failed';}
+    finally{busy(false);}
+  };
+  form.onsubmit=async e=>{
+    e.preventDefault();const credentials=validate();if(!credentials)return;
+    busy(true);status.textContent='Creating account…';
+    try{
+      const {data,error}=await sb.auth.signUp({...credentials,options:{emailRedirectTo:new URL('index.html',location.href).href}});
+      if(error)throw error;
+      if(data.session){await renderAccount();showToast('Account created successfully.');}
+      else status.textContent='Check your email for a confirmation link, then return here to sign in. Check spam if needed.';
+    }catch(e){status.textContent=e.message||'Unable to create account';}
+    finally{busy(false);}
+  };
+  form.append(email,pass,signIn,signUp,status);
+  $('#accountContent').append(note,form);
 }
 async function renderAccount(){
   const s=await session();$('#accountContent').replaceChildren();
