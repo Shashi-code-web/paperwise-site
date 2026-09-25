@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
-import {requireUser,supabaseAdmin,json} from './_lib/supabase.js';
+import {requireUser,supabaseAdmin,json,cors} from './_lib/supabase.js';
 export default async function handler(req,res){
+ cors(req,res);
  res.setHeader('Access-Control-Allow-Headers','Authorization, Content-Type');
  res.setHeader('Access-Control-Allow-Methods','POST,OPTIONS');
  if(req.method==='OPTIONS')return res.status(204).end();
