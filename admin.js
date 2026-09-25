@@ -44,6 +44,19 @@ async function setupMfa(){
  });
  return false;
 }
+async function loadPaymentSettings(){
+ const area=document.getElementById('paymentSettings');if(!area)return;
+ try{
+  const current=await adminApi('/api/payment-settings');
+  area.replaceChildren();
+  const label=document.createElement('label');label.style.cssText='display:flex;align-items:center;gap:10px;margin:12px 0';
+  const toggle=document.createElement('input');toggle.type='checkbox';toggle.checked=Boolean(current.enabled);
+  const caption=document.createElement('span');caption.textContent='Accept new manual UPI payment submissions';
+  const status=document.createElement('p');status.setAttribute('role','status');
+  toggle.onchange=async()=>{toggle.disabled=true;try{const updated=await adminApi('/api/payment-settings',{method:'POST',body:JSON.stringify({enabled:toggle.checked})});toggle.checked=updated.enabled;status.textContent=updated.enabled?'Manual checkout enabled.':'Manual checkout disabled.';}catch(e){toggle.checked=!toggle.checked;status.textContent=e.message;}finally{toggle.disabled=false;}};
+  label.append(toggle,caption);area.append(label,status);
+ }catch(e){area.textContent='Payment settings unavailable: '+e.message;}
+}
 async function loadManualOrders(){
  const area=document.getElementById('manualOrdersList');if(!area)return;
  area.textContent='Loading manual payment submissions…';
@@ -100,7 +113,7 @@ async function loadAdmin(){
  if(metricLabels[0])metricLabels[0].textContent=(metrics.paidOrders||0)+' paid orders';
  if(metricLabels[1])metricLabels[1].textContent='Approved by admin';
  if(metricLabels[2])metricLabels[2].textContent='Expiring download links issued';
- await loadManualOrders();
+ await Promise.all([loadManualOrders(),loadPaymentSettings()]);
  if(!catalog)return;
  catalog.replaceChildren();
  if(!result.products?.length){catalog.textContent='No products yet.';return;}
