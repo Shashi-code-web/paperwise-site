@@ -1,8 +1,8 @@
-import { requireAdmin, supabaseAdmin, json } from './_lib/supabase.js';
+import { requireAdmin, supabaseAdmin, json,cors } from './_lib/supabase.js';
 
 export default async function handler(req,res){
   try{
-    if(req.method==='OPTIONS'){res.setHeader('Access-Control-Allow-Origin','https://shashi-code-web.github.io');res.setHeader('Access-Control-Allow-Headers','Authorization, Content-Type');res.setHeader('Access-Control-Allow-Methods','GET,POST,PATCH,DELETE,OPTIONS');return res.status(204).end();}
+    if(req.method==='OPTIONS'){cors(req,res);return res.status(204).end();}
     await requireAdmin(req);
     const db=supabaseAdmin();
     if(req.method==='GET'){
