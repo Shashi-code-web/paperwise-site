@@ -47,7 +47,7 @@ function renderCart(){
     const remove=document.createElement('button');remove.className='remove';remove.textContent='Remove';remove.dataset.remove=String(i);
     row.append(mini,meta,remove);$('#cartItems').append(row);
   });
-  $('#checkoutBtn').disabled=true;$('#checkoutBtn').textContent='Checkout unavailable';$('#checkoutBtn').style.opacity='.45';
+  $('#checkoutBtn').disabled=!items.length;$('#checkoutBtn').textContent=items.length?'Pay via UPI →':'Add an edition to continue';$('#checkoutBtn').style.opacity=items.length?'1':'.45';
 }
 function drawer(id,on=true){$('#'+id).classList.toggle('open',on);$('#overlay').classList.toggle('open',on);$('#'+id).setAttribute('aria-hidden',!on);}
 async function session(){if(!sb)return null;return (await sb.auth.getSession()).data.session||null;}
@@ -77,7 +77,16 @@ async function renderAccount(){
   $('#accountContent').append(who,signOut,area);
   try{
     const data=await apiFetch('/api/library');
-    if(!data.orders?.length){const empty=document.createElement('p');empty.className='login-note';empty.textContent='Your library is empty. Your paid editions will appear here.';area.append(empty);return;}
+    try{
+      const manual=await apiFetch('/api/manual-orders');
+      for(const order of manual.orders||[]){
+        if(order.status==='paid')continue;
+        const line=document.createElement('p');line.className='login-note';
+        line.textContent=(order.order_items||[]).map(i=>i.products?.title||'Edition').join(', ')+' — '+(order.status==='pending'?'Awaiting admin verification':order.status==='failed'?'Payment not approved':order.status);
+        area.append(line);
+      }
+    }catch(err){console.warn('Manual order status unavailable',err);}
+    if(!data.orders?.length){const empty=document.createElement('p');empty.className='login-note';empty.textContent='Approved editions will appear here for download.';area.append(empty);return;}
     for(const order of data.orders){
       const day=document.createElement('small');day.textContent=order.paid_at?new Date(order.paid_at).toLocaleDateString():'Paid';
       for(const item of order.order_items||[]){
@@ -90,8 +99,33 @@ async function renderAccount(){
   }catch(e){const err=document.createElement('p');err.className='login-note';err.textContent=e.message;area.append(err);}
 }
 async function startCheckout(){
-  showToast('Checkout is temporarily unavailable while we configure a new payment provider.');
+ if(!cart.length)return showToast('Add an edition to your bag first.');
+ const s=await session();if(!s){drawer('cartDrawer',false);drawer('accountDrawer');await renderAccount();showToast('Sign in before paying.');return;}
+ const total=cart.map(productById).filter(Boolean).reduce((sum,p)=>sum+p.price_paise,0);
+ if(!total)return showToast('Your bag is empty.');
+ $('#paymentAmount').textContent='₹'+(total/100).toFixed(2);
+ $('#openUpiApp').href=PAPERWISE_UPI+'&am='+(total/100).toFixed(2)+'&cu=INR';
+ renderPaymentQR($('#paymentQr'));
+ $('#paymentStatus').textContent='';
+ $('#transactionId').value='';
+ $('#submitManualPayment').disabled=false;
+ $('#submitManualPayment').textContent='Submit for admin verification';
+ drawer('cartDrawer',false);
+ $('#paymentDialog').showModal();
 }
+$('#closePayment').onclick=()=>$('#paymentDialog').close();
+$('#manualPaymentForm').onsubmit=async e=>{
+ e.preventDefault();
+ const btn=$('#submitManualPayment'),status=$('#paymentStatus'),reference=$('#transactionId').value.trim().toUpperCase();
+ if(!/^[A-Z0-9]{10,35}$/.test(reference)){status.textContent='Enter a valid transaction ID.';return;}
+ btn.disabled=true;status.textContent='Submitting for administrator review…';
+ try{
+  const result=await apiFetch('/api/checkout',{method:'POST',body:JSON.stringify({productIds:cart,transactionId:reference})});
+  status.textContent=result.message||'Submitted for manual review.';
+  cart=[];save();btn.textContent='Submitted — awaiting admin approval';
+  showToast('Payment submitted. Await administrator approval.');
+ }catch(err){status.textContent=err.message||'Unable to submit payment';btn.disabled=false;}
+};
 
 async function loadProducts(){
   try{const res=await fetch(API+'/api/products');const data=await res.json();if(!res.ok)throw new Error(data.error||'Unable to load editions');products=(data.products||[]);renderProducts();renderCart();}
