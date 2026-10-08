@@ -67,6 +67,7 @@ function renderAccountLogin(){
   const signIn=document.createElement('button');signIn.type='button';signIn.className='button dark full';signIn.textContent='Sign in';
   const signUp=document.createElement('button');signUp.type='submit';signUp.className='button cream full';signUp.style.marginTop='10px';signUp.textContent='Create account';
   const status=document.createElement('p');status.className='login-note';status.setAttribute('role','status');
+
   function validate(){
     const address=email.value.trim();
     if(!address||!email.checkValidity()){status.textContent='Enter a valid email address.';email.focus();return null;}
@@ -74,6 +75,7 @@ function renderAccountLogin(){
     return {email:address,password:pass.value};
   }
   function busy(value){signIn.disabled=value;signUp.disabled=value;}
+
   signIn.onclick=async()=>{
     const credentials=validate();if(!credentials)return;
     busy(true);status.textContent='Signing in…';
@@ -81,17 +83,84 @@ function renderAccountLogin(){
     catch(e){status.textContent=e.message||'Sign in failed';}
     finally{busy(false);}
   };
+
+  async function showVerification(emailAddress){
+    $('#accountContent').replaceChildren();
+    const title=document.createElement('h3');title.textContent='Verify your email';
+    const help=document.createElement('p');help.className='login-note';help.textContent='Enter the 6-digit code we sent to '+emailAddress+'. The code expires shortly.';
+    const otp=document.createElement('input');
+    otp.type='text';otp.inputMode='numeric';otp.autocomplete='one-time-code';otp.placeholder='6-digit verification code';
+    otp.maxLength=6;otp.minLength=6;otp.pattern='[0-9]{6}';otp.required=true;otp.setAttribute('aria-label','6-digit verification code');
+    otp.style.letterSpacing='.28em';otp.style.textAlign='center';otp.style.fontSize='20px';
+    const verify=document.createElement('button');verify.type='button';verify.className='button dark full';verify.textContent='Verify code';
+    const resend=document.createElement('button');resend.type='button';resend.className='button cream full';resend.textContent='Resend code';resend.style.marginTop='10px';
+    const message=document.createElement('p');message.className='login-note';message.setAttribute('role','status');
+    const back=document.createElement('button');back.type='button';back.className='text-link';back.textContent='Use a different email';back.style.marginTop='8px';
+
+    let resendLocked=false;
+    let resendTimer=null;
+    function lockResend(seconds=30){
+      resendLocked=true;let left=seconds;resend.textContent='Resend code ('+left+'s)';
+      clearInterval(resendTimer);
+      resendTimer=setInterval(()=>{left-=1;if(left<=0){clearInterval(resendTimer);resendLocked=false;resend.textContent='Resend code';}else resend.textContent='Resend code ('+left+'s)';},1000);
+    }
+
+    verify.onclick=async()=>{
+      const token=otp.value.trim();
+      if(!/^[0-9]{6}$/.test(token)){message.textContent='Enter the 6-digit code from your email.';otp.focus();return;}
+      verify.disabled=true;resend.disabled=true;message.textContent='Verifying code…';
+      try{
+        const {data,error}=await sb.auth.verifyOtp({email:emailAddress,token,type:'email'});
+        if(error)throw error;
+        if(!data.session)throw new Error('Verification succeeded, but no login session was returned. Please sign in.');
+        showToast('Email verified. Account created successfully.');
+        await renderAccount();
+      }catch(e){
+        message.textContent=e.message||'Invalid or expired verification code.';
+        verify.disabled=false;resend.disabled=resendLocked;
+      }
+    };
+
+    resend.onclick=async()=>{
+      if(resendLocked)return;
+      resend.disabled=true;message.textContent='Sending a new code…';
+      try{
+        const {error}=await sb.auth.resend({
+          type:'signup',
+          email:emailAddress,
+          options:{emailRedirectTo:new URL('index.html',location.href).href}
+        });
+        if(error)throw error;
+        message.textContent='A new 6-digit code was sent. Check your inbox and spam folder.';
+        lockResend(30);
+      }catch(e){
+        message.textContent=e.message||'Unable to resend the code right now.';
+        resend.disabled=false;
+      }
+    };
+
+    back.onclick=()=>renderAccountLogin();
+    otp.oninput=()=>{otp.value=otp.value.replace(/[^0-9]/g,'').slice(0,6);};
+    form.replaceChildren(title,help,otp,verify,resend,message,back);
+    $('#accountContent').append(form);
+    otp.focus();
+  }
+
   form.onsubmit=async e=>{
     e.preventDefault();const credentials=validate();if(!credentials)return;
     busy(true);status.textContent='Creating account…';
     try{
-      const {data,error}=await sb.auth.signUp({...credentials,options:{emailRedirectTo:new URL('index.html',location.href).href}});
+      const {data,error}=await sb.auth.signUp({
+        ...credentials,
+        options:{emailRedirectTo:new URL('index.html',location.href).href}
+      });
       if(error)throw error;
       if(data.session){await renderAccount();showToast('Account created successfully.');}
-      else status.textContent='Check your email for a confirmation link, then return here to sign in. Check spam if needed.';
+      else await showVerification(credentials.email);
     }catch(e){status.textContent=e.message||'Unable to create account';}
     finally{busy(false);}
   };
+
   form.append(email,pass,signIn,signUp,status);
   $('#accountContent').append(note,form);
 }
