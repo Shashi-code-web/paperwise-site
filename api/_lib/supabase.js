@@ -4,7 +4,7 @@ export const adminDb=url&&key?createClient(url,key,{auth:{autoRefreshToken:false
 export function supabaseAdmin(){if(!adminDb)throw Object.assign(new Error('Supabase server configuration missing'),{status:503});return adminDb;}
 export const supabasePublic=supabaseAdmin;
 export async function requireUser(req){
- const token=req.headers.authorization?.replace(/^Bearer\s+/i,'');
+ const token=req.headers.authorization?.replace(/^Bearer\\s+/i,'');
  if(!token)throw Object.assign(new Error('Authentication required'),{status:401});
  const {data,error}=await supabaseAdmin().auth.getUser(token);
  if(error||!data.user)throw Object.assign(new Error('Invalid session'),{status:401});
@@ -14,7 +14,7 @@ export async function requireAdmin(req){
  const user=await requireUser(req);
  const {data,error}=await supabaseAdmin().from('profiles').select('role').eq('id',user.id).single();
  if(error||data?.role!=='admin')throw Object.assign(new Error('Administrator access required'),{status:403});
- const token=req.headers.authorization.replace(/^Bearer\s+/i,'');
+ const token=req.headers.authorization.replace(/^Bearer\\s+/i,'');
  let claims;
  try{claims=JSON.parse(Buffer.from(token.split('.')[1],'base64url').toString('utf8'));}
  catch{throw Object.assign(new Error('Invalid token'),{status:401});}
@@ -22,13 +22,22 @@ export async function requireAdmin(req){
  return user;
 }
 const origins=['https://shashi-code-web.github.io','https://paperwise-store.pages.dev'];
-export function cors(req,res){const requested=req.headers.origin;res.setHeader('Access-Control-Allow-Origin',origins.includes(requested)?requested:origins[0]);res.setHeader('Vary','Origin');res.setHeader('Access-Control-Allow-Headers','Authorization, Content-Type');res.setHeader('Access-Control-Allow-Methods','GET,POST,PATCH,DELETE,OPTIONS');}
+export function cors(req,res){
+ const requested=req.headers.origin;
+ if(requested&&origins.includes(requested))res.setHeader('Access-Control-Allow-Origin',requested);
+ else res.removeHeader('Access-Control-Allow-Origin');
+ res.setHeader('Vary','Origin');
+ res.setHeader('Access-Control-Allow-Headers','Authorization, Content-Type');
+ res.setHeader('Access-Control-Allow-Methods','GET,POST,PATCH,DELETE,OPTIONS');
+}
 export function json(resOrData,status=200,data){
  if(resOrData&&typeof resOrData.status==='function'){
   resOrData.setHeader('Cache-Control','no-store');
-  resOrData.setHeader('Access-Control-Allow-Origin',origins.includes(resOrData.req?.headers?.origin)?resOrData.req.headers.origin:origins[0]);
+  const requested=resOrData.req?.headers?.origin;
+  if(requested&&origins.includes(requested))resOrData.setHeader('Access-Control-Allow-Origin',requested);
+  else resOrData.removeHeader('Access-Control-Allow-Origin');
   resOrData.setHeader('Vary','Origin');
   return resOrData.status(status).json(data);
  }
- return {statusCode:status,headers:{'Content-Type':'application/json','Cache-Control':'no-store','Access-Control-Allow-Origin':origins[0],'Vary':'Origin'},body:JSON.stringify(resOrData)};
+ return {statusCode:status,headers:{'Content-Type':'application/json','Cache-Control':'no-store','Vary':'Origin'},body:JSON.stringify(resOrData)};
 }
