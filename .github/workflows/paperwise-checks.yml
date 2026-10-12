@@ -1,0 +1,57 @@
+name: Paperwise source checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check JavaScript syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r -d '' file; do
+            node --check "$file"
+          done < <(find . -type f -name '*.js' ! -path './.git/*' ! -path './node_modules/*' -print0)
+      - name: Check local page dependencies and sitemap
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync, existsSync } from 'node:fs';
+          import { dirname, resolve } from 'node:path';
+
+          const pages = ['index.html', 'admin.html', 'contact.html', 'privacy.html', 'refunds.html', 'terms.html'];
+          const errors = [];
+          for (const page of pages) {
+            const html = readFileSync(page, 'utf8');
+            for (const match of html.matchAll(/(?:src|href)="([^"]+)"/g)) {
+              const ref = match[1];
+              if (/^(?:https?:|mailto:|tel:|#|data:|javascript:)/i.test(ref)) continue;
+              const path = ref.split(/[?#]/, 1)[0];
+              if (path && !existsSync(resolve(dirname(page), path))) errors.push(page + ' references missing local asset: ' + ref);
+            }
+          }
+          const robots = readFileSync('robots.txt', 'utf8');
+          const sitemap = readFileSync('sitemap.xml', 'utf8');
+          if (!robots.includes('Sitemap: https://paperwise-store.pages.dev/sitemap.xml')) errors.push('robots.txt does not point to the production sitemap');
+          if (!sitemap.includes('<urlset') || !sitemap.includes('</urlset>')) errors.push('sitemap.xml is malformed');
+          if (/shashi-code-web\.github\.io/i.test(sitemap)) errors.push('sitemap.xml contains the old GitHub Pages origin');
+          if (!sitemap.includes('https://paperwise-store.pages.dev/')) errors.push('sitemap.xml does not include the production storefront');
+          if (!readFileSync('index.html', 'utf8').includes('https://paperwise-store.pages.dev/')) errors.push('index.html is missing a production canonical URL');
+          if (!existsSync('assets/phonepe-qr.webp')) errors.push('PhonePe QR asset is missing');
+          if (errors.length) { console.error(errors.join('\n')); process.exit(1); }
+          console.log('JavaScript syntax, local HTML dependencies, and storefront SEO references passed.');
+          NODE

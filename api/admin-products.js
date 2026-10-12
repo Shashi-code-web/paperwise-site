@@ -22,7 +22,7 @@ export default async function handler(req,res){
     if(req.method==='POST'){
       const body=typeof req.body==='string'?JSON.parse(req.body):req.body||{};
       const row={title:String(body.title||'').trim(),description:String(body.description||'').trim(),price_paise:Number(body.price_paise),cover_asset_key:body.cover_asset_key||null,pdf_asset_key:String(body.pdf_asset_key||'').trim(),active:body.active!==false};
-      if(!row.title||!row.description||!Number.isInteger(row.price_paise)||row.price_paise<=0||!row.pdf_asset_key) return json(res,400,{error:'title, description, positive price_paise and pdf_asset_key are required'});
+      if(!row.title||row.title.length>160||!row.description||row.description.length>5000||!Number.isInteger(row.price_paise)||row.price_paise<100||row.price_paise>1000000||!row.pdf_asset_key) return json(res,400,{error:'Valid title, description, price (₹1–₹10,000), and PDF are required'});
       const {data,error}=await db.from('products').insert(row).select('*').single();
       if(error) throw error;
       return json(res,201,{product:data});
@@ -38,8 +38,13 @@ export default async function handler(req,res){
       const body=typeof req.body==='string'?JSON.parse(req.body):req.body||{};
       if(!body.id) return json(res,400,{error:'id is required'});
       const patch={};
-      for(const k of ['title','description','cover_asset_key','pdf_asset_key','active']) if(body[k]!==undefined) patch[k]=body[k];
-      if(body.price_paise!==undefined) patch.price_paise=Number(body.price_paise);
+      if(body.title!==undefined){if(typeof body.title!=='string'||!body.title.trim()||body.title.trim().length>160)return json(res,400,{error:'Title must be 1–160 characters'});patch.title=body.title.trim();}
+      if(body.description!==undefined){if(typeof body.description!=='string'||!body.description.trim()||body.description.trim().length>5000)return json(res,400,{error:'Description must be 1–5000 characters'});patch.description=body.description.trim();}
+      if(body.cover_asset_key!==undefined)patch.cover_asset_key=body.cover_asset_key;
+      if(body.pdf_asset_key!==undefined){if(typeof body.pdf_asset_key!=='string'||!body.pdf_asset_key.trim())return json(res,400,{error:'Invalid PDF asset key'});patch.pdf_asset_key=body.pdf_asset_key.trim();}
+      if(body.active!==undefined){if(typeof body.active!=='boolean')return json(res,400,{error:'Active must be a boolean'});patch.active=body.active;}
+      if(body.price_paise!==undefined){const price=Number(body.price_paise);if(!Number.isInteger(price)||price<100||price>1000000)return json(res,400,{error:'Price must be between ₹1 and ₹10,000'});patch.price_paise=price;}
+      if(!Object.keys(patch).length)return json(res,400,{error:'No valid product fields supplied'});
       patch.updated_at=new Date().toISOString();
       const {data,error}=await db.from('products').update(patch).eq('id',body.id).select('*').single();
       if(error) throw error;

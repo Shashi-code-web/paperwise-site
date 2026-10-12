@@ -1,40 +1,35 @@
-# Paperwise implementation notes
+# Paperwise implementation and security boundaries
 
-This storefront has checkout temporarily disabled while a new payment provider is configured. Any separately deployed payment backend must also have its old Razorpay routes and secrets disabled. This repository change does not disable a separate backend or merchant account.
+## Current payment model
 
-This storefront is a front-end demonstration. Its `Secure checkout` button must be connected to server routes before it can accept payments or deliver files.
+Paperwise currently accepts **manual UPI submissions**. It does not use a live card processor, automatic payment confirmation, or a payment-provider webhook in this repository. Customers submit a transaction reference; the administrator must independently match the transaction and amount in the payment app before marking the order paid. A submitted reference is not proof of payment.
 
-## Recommended production design
+## Customer journey
 
-- Use **Razorpay** (or Cashfree) for India-supported payments. Create orders only from a server endpoint, in INR, with the authoritative product price (₹59), and open the provider checkout using only its publishable key.
-- Merchant bank-account linking, KYC, payout settings, and provider verification belong in the merchant's payment provider dashboard. Do not collect bank information on this public site.
-- On the server, verify the payment signature and also validate the provider webhook signature using the webhook secret held only in environment variables. Make fulfillment idempotent by recording the provider event/payment ID before issuing access.
-- Store source PDFs in a private bucket (for example, S3/R2 private storage), never under the public web root. After the verified webhook marks an order `paid`, issue a short-lived signed download URL or a single-use download token from an authenticated server endpoint.
-- The download endpoint must check the signed-in customer owns the paid order. Rate-limit it and log issuance/download attempts. Do not generate a download from browser code.
-- Keep payment secrets, webhook secrets, database credentials, and storage signing keys in the deployment secret manager; never commit them or expose them in client JavaScript. The site should neither accept nor store card details.
+1. `GET /api/products` returns active catalogue items and whether manual checkout is enabled.
+2. Customer registration, login and 6-digit email verification use Supabase Auth in the browser.
+3. `POST /api/checkout` requires a valid user session, checks that 1–10 distinct active product IDs exist, computes the total from database prices, checks that manual checkout is enabled, and records a pending order plus its items. Normalized transaction references are unique.
+4. `GET /api/manual-orders` and `GET /api/library` return the signed-in customer's own order information and paid purchases.
+5. `POST /api/admin-manual-orders` requires an administrator role and a verified AAL2 session; it permits only pending manual orders and uses a conditional update to avoid double-review.
+6. `POST /api/download` and the legacy `POST /api/downloads/:orderItemId` route verify ownership of a paid order before returning a signed URL. The `private-pdfs` bucket must remain private; generated download URLs expire after ten minutes.
 
-## Core data model
+## Admin and product routes
 
-`users`: id, email, password_hash / provider_id, two_factor_enabled, created_at
+- `GET/POST/PATCH/DELETE /api/admin-products`: administrator-only catalogue management and metrics.
+- `POST /api/admin/upload`: administrator-only signed upload setup for PDFs up to 50 MB.
+- `GET/PATCH /api/admin/products` and `GET /api/admin/stats`: retained legacy endpoints; they use the same administrator authorization boundary.
+- `GET/POST /api/payment-settings`: administrator-only settings, with AAL2 required for both reading and changing the setting.
 
-`products`: id, title, description, price_paise, cover_asset_key, pdf_asset_key, active, updated_at
+The server uses `SUPABASE_SERVICE_ROLE_KEY` only inside API handlers after authorization. Do not put that key in browser assets. Browser CORS is restricted to the known storefront origins.
 
-`orders`: id, user_id, amount_paise, currency, status, provider_order_id, provider_payment_id, paid_at
+## Data and storage
 
-`order_items`: id, order_id, product_id, unit_price_paise
+- `products.price_paise` and order totals are integer paise; display formatting must not round them to whole rupees.
+- `orders.status` stays pending until manual payment approval; rejection marks the order failed.
+- Source PDFs are stored in Supabase Storage bucket `private-pdfs`, not in the public website directory.
+- `download_tokens` records download-link issuance and expiry. It is an audit record; the signed Storage URL is the capability that grants temporary download access.
+- `manual_payment_settings`, `download_tokens` and `webhook_events` are server-only tables protected from browser clients by RLS.
 
-`webhook_events`: provider_event_id (unique), payload_hash, received_at, processed_at
+## Pre-launch tasks
 
-`download_tokens`: id, order_item_id, token_hash, expires_at, used_at
-
-## Routes and access controls
-
-- `POST /api/checkout`: authenticated user; validates cart/product IDs and prices server-side; creates provider order.
-- `POST /api/webhooks/payment-provider`: public endpoint; raw-body HMAC verification before processing; idempotent.
-- `GET /api/me/orders`: authenticated user; returns only their orders.
-- `POST /api/downloads/:orderItemId`: authenticated owner of a `paid` order; returns an expiring signed URL.
-- `/admin/*`: administrator role plus TOTP/WebAuthn second factor, secure session cookies, CSRF protection, audit logging and rate limits. Admins upload PDFs to private storage, edit product content/₹ price, and view/manage sales; they never see card details.
-
-## Public-policy pages
-
-Create `/privacy`, `/terms`, `/refunds`, and `/contact` server pages with your business identity and a reviewed policy before launch. The footer in this demo intentionally links to these pages; their final legal copy should be reviewed for the jurisdiction and actual refund practice.
+A real support address must replace the placeholder on `contact.html`. The store owner must independently verify the displayed UPI destination and QR, review the privacy/terms/refund text, confirm Supabase email delivery and rate limits, and complete a safe end-to-end test plan without charging real money or fabricating payment references.

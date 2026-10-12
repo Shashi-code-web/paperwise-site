@@ -98,6 +98,8 @@ async function loadAdmin(){
  if(!sb||!apiBase){message('Missing browser configuration.');return;}
  const {data:{session},error}=await sb.auth.getSession();
  if(error||!session){location.replace('index.html?adminLogin=1');return;}
+ const {data:profile,error:profileError}=await sb.from('profiles').select('role').eq('id',session.user.id).maybeSingle();
+ if(profileError||profile?.role!=='admin'){location.replace('index.html');return;}
  const verified=await setupMfa();
  if(!verified){if(catalog)catalog.textContent='Complete two-factor verification to view products.';return;}
  let result;

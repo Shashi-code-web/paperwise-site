@@ -2,6 +2,7 @@ const API=(window.PAPERWISE_API_BASE||'').replace(/\/$/,'');
 const sb=window.supabase&&window.PAPERWISE_SUPABASE_URL&&window.PAPERWISE_SUPABASE_ANON_KEY
   ?window.supabase.createClient(window.PAPERWISE_SUPABASE_URL,window.PAPERWISE_SUPABASE_ANON_KEY):null;
 let products=[];
+let manualCheckoutEnabled=false;
 let cart=[];
 try{const stored=JSON.parse(localStorage.getItem('paperwise-cart')||'[]');cart=Array.isArray(stored)?stored.filter(id=>typeof id==='string'):[];}catch{localStorage.removeItem('paperwise-cart');}
 const $=s=>document.querySelector(s),grid=$('#productGrid'),toast=$('#toast');
@@ -9,6 +10,7 @@ const $=s=>document.querySelector(s),grid=$('#productGrid'),toast=$('#toast');
 function showToast(message){toast.textContent=message;toast.classList.add('show');setTimeout(()=>toast.classList.remove('show'),2800);}
 function save(){localStorage.setItem('paperwise-cart',JSON.stringify(cart));renderCart();}
 function colorFor(index){return ['sage','peach','lavender'][index%3];}
+function formatRupees(paise){return '₹'+(Number(paise)/100).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});}
 function productById(id){return products.find(p=>p.id===id);}
 function renderProducts(){
   grid.replaceChildren();
@@ -24,7 +26,7 @@ function renderProducts(){
     cover.append(label,title,foot);
     const info=document.createElement('div');info.className='product-info';
     const h=document.createElement('h3');h.textContent=p.title;
-    const price=document.createElement('span');price.className='price';price.textContent='₹'+(p.price_paise/100).toFixed(0);
+    const price=document.createElement('span');price.className='price';price.textContent=formatRupees(p.price_paise);
     const desc=document.createElement('p');desc.textContent=p.description;
     const actions=document.createElement('div');actions.className='product-actions';
     const preview=document.createElement('button');preview.className='tiny-btn preview';preview.textContent='Preview';preview.dataset.preview=p.id;
@@ -38,17 +40,17 @@ function renderCart(){
   if(products.length && visibleCart.length!==cart.length){cart=visibleCart;localStorage.setItem('paperwise-cart',JSON.stringify(cart));}
   $('#cartCount').textContent=visibleCart.length;
   const items=visibleCart.map(productById);
-  $('#cartTotal').textContent='₹'+(items.reduce((n,p)=>n+p.price_paise,0)/100).toFixed(0);
+  $('#cartTotal').textContent=formatRupees(items.reduce((n,p)=>n+p.price_paise,0));
   $('#cartItems').innerHTML='';
   if(!items.length){$('#cartItems').innerHTML='<div class="empty">Your bag is waiting for a good read.</div>';}
   else items.forEach((p,i)=>{
     const row=document.createElement('div');row.className='cart-item';
     const mini=document.createElement('div');mini.className='mini-cover '+colorFor(products.indexOf(p));mini.textContent=p.title;
-    const meta=document.createElement('div');const h=document.createElement('h4');h.textContent=p.title;const d=document.createElement('p');d.textContent='Digital PDF · ₹'+(p.price_paise/100).toFixed(0);meta.append(h,d);
+    const meta=document.createElement('div');const h=document.createElement('h4');h.textContent=p.title;const d=document.createElement('p');d.textContent='Digital PDF · '+formatRupees(p.price_paise);meta.append(h,d);
     const remove=document.createElement('button');remove.className='remove';remove.textContent='Remove';remove.dataset.remove=String(i);
     row.append(mini,meta,remove);$('#cartItems').append(row);
   });
-  $('#checkoutBtn').disabled=!items.length;$('#checkoutBtn').textContent=items.length?'Pay via UPI →':'Add an edition to continue';$('#checkoutBtn').style.opacity=items.length?'1':'.45';
+  const canPay=items.length>0&&manualCheckoutEnabled;$('#checkoutBtn').disabled=!canPay;$('#checkoutBtn').textContent=!items.length?'Add an edition to continue':canPay?'Pay via UPI →':'Checkout temporarily unavailable';$('#checkoutBtn').style.opacity=canPay?'1':'.45';
 }
 function drawer(id,on=true){$('#'+id).classList.toggle('open',on);$('#overlay').classList.toggle('open',on);$('#'+id).setAttribute('aria-hidden',!on);}
 async function session(){if(!sb)return null;return (await sb.auth.getSession()).data.session||null;}
@@ -196,10 +198,11 @@ async function renderAccount(){
 }
 async function startCheckout(){
  if(!cart.length)return showToast('Add an edition to your bag first.');
+ if(!manualCheckoutEnabled)return showToast('Manual checkout is temporarily unavailable. Please try again later.');
  const s=await session();if(!s){drawer('cartDrawer',false);drawer('accountDrawer');await renderAccount();showToast('Sign in before paying.');return;}
  const total=cart.map(productById).filter(Boolean).reduce((sum,p)=>sum+p.price_paise,0);
  if(!total)return showToast('Your bag is empty.');
- $('#paymentAmount').textContent='₹'+(total/100).toFixed(2);
+ $('#paymentAmount').textContent=formatRupees(total);
  $('#openUpiApp').href=PAPERWISE_UPI+'&am='+(total/100).toFixed(2)+'&cu=INR';
  renderPaymentQR($('#paymentQr'));
  $('#paymentStatus').textContent='';
@@ -224,7 +227,7 @@ $('#manualPaymentForm').onsubmit=async e=>{
 };
 
 async function loadProducts(){
-  try{const res=await fetch(API+'/api/products');const data=await res.json();if(!res.ok)throw new Error(data.error||'Unable to load editions');products=(data.products||[]);renderProducts();renderCart();}
+  try{const res=await fetch(API+'/api/products');const data=await res.json();if(!res.ok)throw new Error(data.error||'Unable to load editions');products=(data.products||[]);manualCheckoutEnabled=data.manualCheckoutEnabled===true;renderProducts();renderCart();}
   catch(e){grid.innerHTML='<div class="empty" style="grid-column:1/-1">The catalogue is temporarily unavailable. Please try again shortly.</div>';showToast(e.message);}
 }
 renderProducts();renderCart();loadProducts();
@@ -252,6 +255,6 @@ $('#newsletterForm').onsubmit=e=>{e.preventDefault();showToast('Newsletter sign-
   box.innerHTML='<div style="position:fixed;inset:0;background:rgba(13,23,36,.96);z-index:99999;display:flex;align-items:center;justify-content:center;padding:24px"><div style="background:#fff;width:100%;max-width:420px;padding:32px;border-radius:16px;box-sizing:border-box"><h2 style="margin-top:0">Paperwise Admin</h2><p>Sign in to continue to the admin console.</p><input id="adminEmail" type="email" placeholder="Admin email" autocomplete="username" style="width:100%;padding:14px;margin:8px 0;box-sizing:border-box"><input id="adminPassword" type="password" placeholder="Password" autocomplete="current-password" style="width:100%;padding:14px;margin:8px 0;box-sizing:border-box"><button id="adminLoginButton" style="width:100%;padding:14px;margin-top:10px;cursor:pointer">Sign in</button><p id="adminLoginMessage" style="margin-top:14px"></p><button id="adminBackButton" style="border:0;background:none;cursor:pointer">← Back to Paperwise</button></div></div>';
   document.body.appendChild(box);
   const email=$('#adminEmail'),password=$('#adminPassword'),button=$('#adminLoginButton'),message=$('#adminLoginMessage'),back=$('#adminBackButton');
-  button.onclick=async()=>{message.textContent='Signing in…';button.disabled=true;const {error}=await sb.auth.signInWithPassword({email:email.value.trim(),password:password.value});if(error){message.textContent=error.message;button.disabled=false;return;}location.href='admin.html?v=7';};
+  button.onclick=async()=>{message.textContent='Signing in…';button.disabled=true;const {error}=await sb.auth.signInWithPassword({email:email.value.trim(),password:password.value});if(error){message.textContent=error.message;button.disabled=false;return;}location.href='admin.html?v=14';};
   back.onclick=()=>location.href='index.html';
 })();
