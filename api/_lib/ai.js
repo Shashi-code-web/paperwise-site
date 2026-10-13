@@ -379,6 +379,13 @@ export async function handleAiRequest(req, res, role) {
         return sendJson(req, res, 503, { error: 'I could not finish that lookup. Please try a simpler question.' });
       }
       const text = String(response.output_text || '').trim().slice(0, 8000);
+      // Record only aggregate token usage metadata for cost monitoring; never log prompts or replies.
+      console.info('Paperwise AI usage', {
+        role,
+        model: process.env.OPENAI_MODEL,
+        inputTokens: Number(response.usage?.input_tokens) || 0,
+        outputTokens: Number(response.usage?.output_tokens) || 0
+      });
       return sendJson(req, res, 200, { reply: text || 'I could not produce a reliable answer from the available information. Please try again.' });
     } catch (error) {
       const publicError = safeModelError(error);

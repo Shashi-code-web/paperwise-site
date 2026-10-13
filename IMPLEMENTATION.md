@@ -44,3 +44,6 @@ The customer route permits guests only for public catalogue and checkout-status 
 Function arguments are validated against a named allowlist; product facts come from the active catalogue; aggregate sales are computed in SQL; pending submission summaries omit personal identifiers and UPI references. Untrusted user/history/catalogue text is bounded and basic secret-like data is redacted before model input. Requests, chat turns, model output, and tool loops have limits. Shared rate limits depend on the incremental migration function `consume_ai_rate_limit`; database control failures cause the AI routes to fail closed, not the store. `ai_sales_summary` is a read-only database aggregate used only by authorized server code.
 
 The AI chat history exists only in page memory during the active page session; the implementation does not persist conversation history to localStorage or a chat database. Do not add user-facing write tools without separate validated endpoints, explicit confirmation, role/MFA checks, and auditable backend confirmation.
+
+
+Successful AI calls emit a minimal Vercel runtime log with only the assistant role, configured model name, and input/output token counts for cost monitoring. Prompt text, generated reply text, customer identifiers and payment data are not logged.
