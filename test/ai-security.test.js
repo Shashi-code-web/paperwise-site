@@ -29,6 +29,8 @@ test('rejects malformed, empty, oversized, or extra-field requests', () => {
 test('redacts credentials, contact data, verification codes, and transaction identifiers before model use', () => {
   const sanitized = sanitizeForModel('Email: buyer@example.com password: MyPass123 OTP 123456 UPI PIN: 7777 transaction ID: A1B2C3D4E5F6G7H8');
   assert.doesNotMatch(sanitized, /buyer@example\.com|MyPass123|123456|7777|A1B2C3D4E5F6G7H8/);
+  const envValue = sanitizeForModel('SUPABASE_SERVICE_ROLE_KEY=EXAMPLEVALUE1234567890');
+  assert.equal(envValue.includes('EXAMPLEVALUE1234567890'), false);
   assert.match(sanitized, /\[redacted/);
 });
 

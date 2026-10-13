@@ -44,6 +44,7 @@ export function sanitizeForModel(value) {
   if (typeof value !== 'string') return '';
   let text = value.replace(/[\u0000-\u001F\u007F]/g, ' ').replace(/\s+/g, ' ').trim();
   text = text.replace(/\bBearer\s+[A-Za-z0-9._~+/-]{8,}={0,2}\b/gi, '[redacted credential]');
+  text = text.replace(/\b(OPENAI_API_KEY|SUPABASE_SERVICE_ROLE_KEY|SUPABASE_ACCESS_TOKEN|SUPABASE_DB_URL|API_KEY|SECRET_KEY|ACCESS_TOKEN|REFRESH_TOKEN)\s*(?:=|:)\s*[^\s,;]{4,500}/gi, '$1=[redacted]');
   text = text.replace(/\b(?:sk-[A-Za-z0-9_-]{12,}|sb_secret_[A-Za-z0-9_-]{12,}|sbp_[A-Za-z0-9_-]{12,})\b/gi, '[redacted key]');
   text = text.replace(/\b(password|passcode|one[- ]time code|verification code|otp|upi pin|transaction id|transaction reference|utr|api key|secret key|access token|refresh token)\s*(?:is|=|:|#|-)?\s*[^\s,;]{4,120}/gi, '$1 [redacted]');
   text = text.replace(/\b[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}\b/g, '[redacted email]');
