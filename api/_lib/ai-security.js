@@ -58,12 +58,13 @@ export function sanitizeForModel(value) {
 
 export function cleanUntrustedText(value, maxLength = 280) {
   if (typeof value !== 'string') return '';
-  return value
+  const cleaned = value
     .replace(/<[^>]*>/g, ' ')
     .replace(/[\u0000-\u001F\u007F]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, maxLength);
+  return sanitizeForModel(cleaned).slice(0, maxLength);
 }
 
 export function validateToolArguments(name, value) {

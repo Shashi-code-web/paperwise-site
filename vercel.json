@@ -1,1 +1,17 @@
-{ "functions": { "api/**/*.js": { "maxDuration": 10 } } }
+{
+  "functions": {
+    "api/**/*.js": {
+      "maxDuration": 10
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/admin/products",
+      "destination": "/api/admin-products"
+    },
+    {
+      "source": "/api/admin/stats",
+      "destination": "/api/admin-products?legacyStats=1"
+    }
+  ]
+}

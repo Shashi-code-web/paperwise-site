@@ -34,6 +34,7 @@ test('redacts credentials, contact data, verification codes, and transaction ide
 
 test('cleans untrusted database text and rejects unknown/write tool arguments', () => {
   assert.equal(cleanUntrustedText('<script>alert(1)</script>Friendly PDF', 50), 'alert(1) Friendly PDF');
+  assert.doesNotMatch(cleanUntrustedText('Email buyer@example.com; password MyPass123; UPI PIN 7777', 180), /buyer@example\.com|MyPass123|7777/);
   assert.deepEqual(validateToolArguments('search_catalogue', { query: 'habits' }), { query: 'habits' });
   assert.throws(() => validateToolArguments('search_catalogue', { query: 'habits', limit: 999 }), /Invalid catalogue query/);
   assert.deepEqual(validateToolArguments('get_sales_summary', { timeframe: '30d' }), { timeframe: '30d' });

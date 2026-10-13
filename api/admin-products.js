@@ -7,6 +7,14 @@ export default async function handler(req,res){
     await requireAdmin(req);
     const db=supabaseAdmin();
     if(req.method==='GET'){
+      // Compatibility handler for the legacy /api/admin/stats rewrite. Keeps the same
+      // response shape without requiring a separate Vercel serverless function.
+      if(req.query?.legacyStats==='1'){
+        const {data:orders,error:statsError}=await db.from('orders').select('amount_paise,status');
+        if(statsError)throw statsError;
+        const paid=(orders||[]).filter(o=>o.status==='paid');
+        return json(res,200,{netSalesPaise:paid.reduce((sum,o)=>sum+o.amount_paise,0),paidOrders:paid.length});
+      }
       const [{data:products,error},{data:orders,error:oe},{count:downloadCount,error:de}]=await Promise.all([
         db.from('products').select('*').order('updated_at',{ascending:false}),
         db.from('orders').select('amount_paise,status'),
