@@ -14,7 +14,7 @@ test('validates bounded customer/admin chat payloads and drops untrusted history
   }, '140');
   assert.equal(payload.message, 'How do I find a PDF?');
   assert.deepEqual(payload.history.map((entry) => entry.role), ['user', 'assistant']);
-  assert.equal(AI_LIMITS.toolRounds, 3);
+  assert.equal(AI_LIMITS.toolRounds, 2);
 });
 
 test('rejects malformed, empty, oversized, or extra-field requests', () => {
