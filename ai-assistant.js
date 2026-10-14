@@ -111,7 +111,7 @@
         const endpoint = adminMode ? '/api/ai/admin-assistant' : '/api/ai/customer-chat';
         const response = await fetch(apiBase + endpoint, {
           method: 'POST', headers, body: JSON.stringify({ message, history: history.slice(-8) }),
-          signal: AbortSignal.timeout(16000)
+          signal: AbortSignal.timeout(28000)
         });
         const data = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(data.error || 'The assistant is temporarily unavailable.');
