@@ -1,1 +1,25 @@
-{ "functions": { "api/**/*.js": { "maxDuration": 10 } } }
+{
+  "functions": {
+    "api/**/*.js": {
+      "maxDuration": 30
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/ai/customer-chat",
+      "destination": "/api/ai?assistant=customer"
+    },
+    {
+      "source": "/api/ai/admin-assistant",
+      "destination": "/api/ai?assistant=admin"
+    },
+    {
+      "source": "/api/admin/products",
+      "destination": "/api/admin-products?legacy=products"
+    },
+    {
+      "source": "/api/admin/stats",
+      "destination": "/api/admin-products?legacy=stats"
+    }
+  ]
+}

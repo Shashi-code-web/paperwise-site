@@ -4,9 +4,14 @@
   "version": "1.0.0",
   "type": "module",
   "engines": {
-    "node": ">=20"
+    "node": "24.x"
+  },
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "check": "node --check app.js && node --check admin.js && node --check ai-assistant.js && node --check api/_lib/http.js && node --check api/_lib/supabase.js && node --check api/ai.js && node --check api/admin-manual-orders.js && node --check api/admin-products.js && node --check api/checkout.js && node --check api/download.js && node --check 'api/downloads/[orderItemId].js' && node --check api/library.js && node --check api/manual-orders.js && node --check api/payment-settings.js && node --check api/products.js"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.49.1"
+    "@supabase/supabase-js": "^2.49.1",
+    "openai": "^7.17.0"
   }
 }
