@@ -19,7 +19,7 @@ create or replace function public.consume_ai_rate_limit(
 ) returns boolean
 language plpgsql
 security definer
-set search_path = pg_catalog, public
+set search_path = pg_catalog
 as $$
 declare
   v_window_start timestamptz;
@@ -64,7 +64,7 @@ returns jsonb
 language sql
 stable
 security definer
-set search_path = pg_catalog, public
+set search_path = pg_catalog
 as $$
   select jsonb_build_object(
     'paid_orders', count(*) filter (
