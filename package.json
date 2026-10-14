@@ -4,14 +4,14 @@
   "version": "1.0.0",
   "type": "module",
   "engines": {
-    "node": ">=20"
+    "node": "24.x"
   },
   "scripts": {
     "test": "node --test tests/*.test.js",
-    "check": "node --check app.js && node --check admin.js && node --check ai-assistant.js && node --check api/_lib/ai.js && node --check api/ai/customer-chat.js && node --check api/ai/admin-assistant.js"
+    "check": "node --check app.js && node --check admin.js && node --check ai-assistant.js && node --check api/_lib/ai.js && node --check api/ai.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.1",
-    "openai": "^5.20.0"
+    "openai": "^7.17.0"
   }
-}
+}\n
