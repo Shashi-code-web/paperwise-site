@@ -6,9 +6,16 @@ export default async function handler(req,res){
     if(req.method==='OPTIONS')return res.status(204).end();
     await requireAdmin(req);
     const db=supabaseAdmin();
+    if(req.method==='GET' && req.query?.legacy==='stats'){
+      const {data:orders,error}=await db.from('orders').select('amount_paise,status');
+      if(error) throw error;
+      const paid=(orders||[]).filter(o=>o.status==='paid');
+      return json(res,200,{netSalesPaise:paid.reduce((sum,o)=>sum+o.amount_paise,0),paidOrders:paid.length});
+    }
     if(req.method==='GET'){
+      const selectFields=req.query?.legacy==='products'?'id,title,description,price_paise,active,updated_at':'*';
       const [{data:products,error},{data:orders,error:oe},{count:downloadCount,error:de}]=await Promise.all([
-        db.from('products').select('*').order('updated_at',{ascending:false}),
+        db.from('products').select(selectFields).order('updated_at',{ascending:false}),
         db.from('orders').select('amount_paise,status'),
         db.from('download_tokens').select('id',{count:'exact',head:true})
       ]);
@@ -17,6 +24,7 @@ export default async function handler(req,res){
       if(de) throw de;
       const paidOrders=(orders||[]).filter(o=>o.status==='paid');
       const netSalesPaise=paidOrders.reduce((sum,o)=>sum+o.amount_paise,0);
+      if(req.query?.legacy==='products')return json(res,200,{products:products||[]});
       return json(res,200,{products:products||[],metrics:{netSalesPaise,paidOrders:paidOrders.length,downloadLinksIssued:downloadCount||0}});
     }
     if(req.method==='POST'){
@@ -43,7 +51,8 @@ export default async function handler(req,res){
       if(body.cover_asset_key!==undefined)patch.cover_asset_key=body.cover_asset_key;
       if(body.pdf_asset_key!==undefined){if(typeof body.pdf_asset_key!=='string'||!body.pdf_asset_key.trim())return json(res,400,{error:'Invalid PDF asset key'});patch.pdf_asset_key=body.pdf_asset_key.trim();}
       if(body.active!==undefined){if(typeof body.active!=='boolean')return json(res,400,{error:'Active must be a boolean'});patch.active=body.active;}
-      if(body.price_paise!==undefined){const price=Number(body.price_paise);if(!Number.isInteger(price)||price<100||price>1000000)return json(res,400,{error:'Price must be between ₹1 and ₹10,000'});patch.price_paise=price;}
+      const rawPrice=body.price_paise!==undefined?body.price_paise:body.pricePaise;
+      if(rawPrice!==undefined){const price=Number(rawPrice);if(!Number.isInteger(price)||price<100||price>1000000)return json(res,400,{error:'Price must be between ₹1 and ₹10,000'});patch.price_paise=price;}
       if(!Object.keys(patch).length)return json(res,400,{error:'No valid product fields supplied'});
       patch.updated_at=new Date().toISOString();
       const {data,error}=await db.from('products').update(patch).eq('id',body.id).select('*').single();
