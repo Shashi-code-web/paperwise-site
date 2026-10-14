@@ -19,6 +19,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Install server dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund
       - name: Check JavaScript syntax
         shell: bash
         run: |
@@ -26,6 +28,8 @@ jobs:
           while IFS= read -r -d '' file; do
             node --check "$file"
           done < <(find . -type f -name '*.js' ! -path './.git/*' ! -path './node_modules/*' -print0)
+      - name: Run AI request validation tests
+        run: npm test
       - name: Check local page dependencies and sitemap
         shell: bash
         run: |
@@ -53,5 +57,5 @@ jobs:
           if (!readFileSync('index.html', 'utf8').includes('https://paperwise-store.pages.dev/')) errors.push('index.html is missing a production canonical URL');
           if (!existsSync('assets/phonepe-qr.webp')) errors.push('PhonePe QR asset is missing');
           if (errors.length) { console.error(errors.join('\n')); process.exit(1); }
-          console.log('JavaScript syntax, local HTML dependencies, and storefront SEO references passed.');
+          console.log('JavaScript syntax, AI validation tests, local HTML dependencies, and storefront SEO references passed.');
           NODE
