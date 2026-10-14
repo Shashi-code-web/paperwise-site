@@ -19,6 +19,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Install application dependencies for tests
+        run: npm install --ignore-scripts --no-audit --no-fund
       - name: Check JavaScript syntax
         shell: bash
         run: |
@@ -26,6 +28,8 @@ jobs:
           while IFS= read -r -d '' file; do
             node --check "$file"
           done < <(find . -type f -name '*.js' ! -path './.git/*' ! -path './node_modules/*' -print0)
+      - name: Run AI security and request validation tests
+        run: node --test
       - name: Check local page dependencies and sitemap
         shell: bash
         run: |

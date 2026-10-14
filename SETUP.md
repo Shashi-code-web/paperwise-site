@@ -30,3 +30,12 @@ After each release, inspect the Git commit and hosting build status. Smoke-test 
 ## Launch blocker
 
 Publish a real, monitored support address on the contact page before inviting customers. Review all public policies for the operating entity and actual refund process.
+
+
+## Optional OpenAI assistants
+
+1. In Vercel Project Settings for `paperwise-api`, add `OPENAI_API_KEY` as an encrypted server-only environment variable and `OPENAI_MODEL` as the model name enabled for your OpenAI API project. Add them to the Production environment, and Preview only if you intend to test AI on previews. Never place the OpenAI key in `config.js`, HTML, or browser storage. Do not paste its value into GitHub or chat.
+2. The application intentionally has no guessed model fallback. If either variable is missing or OpenAI returns an error, the assistant shows a safe setup/retry message; existing checkout and download routes are separate and continue operating.
+3. Review and apply `supabase/migrations/20261014000100_paperwise_ai_controls.sql` as an incremental migration to the existing production database before exposing AI. It creates an RLS-protected shared limiter table and a service-role-only consume function, plus a restricted sales summary function. Do not rerun the bootstrap `supabase/schema.sql` or reset production.
+4. In the repository workspace, install dependencies using `npm install` to install the official `openai` JavaScript SDK, then run `npm test` and the existing JavaScript syntax/local-asset checks. Confirm the CI run for the exact commit before promoting deployment.
+5. The admin Copilot is read-only: payment verification, catalogue changes, payment settings and file access remain existing human-controlled application flows. Review all assistant output and independently verify transactions in the payment app.
