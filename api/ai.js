@@ -17,7 +17,7 @@ const ADMIN_TOOLS = [
     parameters:{type:'object',properties:{query:{type:'string',description:'Search phrase, up to 80 characters.'}},required:['query'],additionalProperties:false} }
 ];
 function appError(status,message){return Object.assign(new Error(message),{status,safeMessage:message});}
-function parseRequest(req){
+export function parseRequest(req){
   let body=req.body;
   if(typeof body==='string'){if(body.length>MAX_BODY_LENGTH)throw appError(413,'Request too large. Please shorten your message.');try{body=JSON.parse(body);}catch{throw appError(400,'Invalid request.');}}
   if(!body||typeof body!=='object'||Array.isArray(body))throw appError(400,'Invalid request.');
