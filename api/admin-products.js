@@ -12,8 +12,13 @@ export default async function handler(req,res){
       const paid=(orders||[]).filter(o=>o.status==='paid');
       return json(res,200,{netSalesPaise:paid.reduce((sum,o)=>sum+o.amount_paise,0),paidOrders:paid.length});
     }
+    if(req.method==='GET' && req.query?.legacy==='products'){
+      const {data,error}=await db.from('products').select('id,title,description,price_paise,active,updated_at').order('updated_at',{ascending:false});
+      if(error) throw error;
+      return json(res,200,{products:data||[]});
+    }
     if(req.method==='GET'){
-      const selectFields=req.query?.legacy==='products'?'id,title,description,price_paise,active,updated_at':'*';
+      const selectFields='*';
       const [{data:products,error},{data:orders,error:oe},{count:downloadCount,error:de}]=await Promise.all([
         db.from('products').select(selectFields).order('updated_at',{ascending:false}),
         db.from('orders').select('amount_paise,status'),
