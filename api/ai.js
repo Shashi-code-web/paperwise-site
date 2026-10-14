@@ -116,7 +116,7 @@ async function adminTool(name,args,db){
 }
 export default async function handler(req,res){
   cors(req,res);res.setHeader('Access-Control-Allow-Methods','POST,OPTIONS');res.setHeader('Access-Control-Allow-Headers','Authorization, Content-Type');
-  const origin=req.headers.origin;if(origin&&!ALLOWED_ORIGINS.has(origin))return json(res,403,{error:'Origin not allowed.'});
+  const origin=req.headers.origin;if(origin&&!ALLOWED_ORIGINS.has(origin)){res.removeHeader('Access-Control-Allow-Origin');res.setHeader('Cache-Control','no-store');return res.status(403).json({error:'Origin not allowed.'});}
   if(req.method==='OPTIONS')return res.status(204).end();
   if(req.method!=='POST')return json(res,405,{error:'Method not allowed'});
   try{
