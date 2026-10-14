@@ -73,8 +73,8 @@ as $$
     'net_sales_paise', coalesce(sum(amount_paise) filter (
       where status = 'paid' and (p_since is null or paid_at >= p_since)
     ), 0),
-    'earliest_paid_at', min(paid_at) filter (where status = 'paid'),
-    'latest_paid_at', max(paid_at) filter (where status = 'paid'),
+    'earliest_paid_at', min(paid_at) filter (where status = 'paid' and (p_since is null or paid_at >= p_since)),
+    'latest_paid_at', max(paid_at) filter (where status = 'paid' and (p_since is null or paid_at >= p_since)),
     'pending_manual_orders', count(*) filter (
       where status = 'pending' and manual_payment_reference is not null
     ),
